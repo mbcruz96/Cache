@@ -27,8 +27,6 @@ module cache_top(
   input replace_policy,
   input[1:0] inclusion_policy,
   input[31:0] cache_addr,
-  input[4:0] cache_size,
-  input[3:0] assoc,
   output reg[11:0] cache_miss_rate,
   output reg[11:0] num_reads,
   output reg[11:0] num_writes
@@ -36,10 +34,12 @@ module cache_top(
   
   // Cache properties
   parameter BLOCKSIZE = 64;
-  wire[4:0] num_sets = cache_size/(BLOCKSIZE * assoc);
+  parameter CACHESIZE = 32;
+  parameter ASSOC = 8;
+  parameter  NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
   reg[31:0] index;         
   reg[31:0] tag;
-  reg[31:0] cache_lru;
+  reg[31:0] cache [0:NUMSETS];
 
   
   // FSM Regs and Parameters
@@ -48,7 +48,7 @@ module cache_top(
   
   // Counter variables
   reg [7:0] num_misses, num_hits;
-  
+  integer i;
   // Replacement policy FSM | Combinational logic
   always@(*)begin
    
@@ -68,7 +68,7 @@ module cache_top(
         // Read in address to find tag, index, and block off-set
         READ:begin
             tag <= cache_addr / BLOCKSIZE;
-            index <= cache_addr / (BLOCKSIZE*assoc);
+            index <= cache_addr / (BLOCKSIZE*ASSOC);
             
         end
         
@@ -77,6 +77,17 @@ module cache_top(
             
             // FIFO
             if(replace_policy == 0)begin
+                
+                // If The current FIFO 
+                if(cache[NUMSETS] != 0)begin
+                
+                    for(i = NUMSETS; i > 0; i = i - 1)begin
+                        cache[NUMSETS] <= cache[i-1];
+                    end
+                    
+                    cache[0] <= tag;
+                end
+                
             end
             
             // LRU
