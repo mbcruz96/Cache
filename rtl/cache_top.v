@@ -39,7 +39,7 @@ module cache_top(
   parameter  NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
   reg[31:0] index;         
   reg[31:0] tag;
-  reg[31:0] cache [0:NUMSETS];
+  reg[31:0] cache [0:NUMSETS][0:ASSOC];
 
   
   // FSM Regs and Parameters
@@ -67,9 +67,9 @@ module cache_top(
         
         // Read in address to find tag, index, and block off-set
         READ:begin
-            tag <= cache_addr / BLOCKSIZE;
-            index <= cache_addr / (BLOCKSIZE*ASSOC);
-            
+            tag <= cache_addr / BLOCKSIZE;               // Current Tag address derived from the input cache address
+            index <= (cache_addr / BLOCKSIZE) % NUMSETS; // Current Set that the tag will go into
+            next_state <= SEARCH;
         end
         
         // Search for tag state | Increment misses or hits
@@ -78,16 +78,34 @@ module cache_top(
             // FIFO
             if(replace_policy == 0)begin
                 
-                // If The current FIFO 
-                if(cache[NUMSETS] != 0)begin
-                
-                    for(i = NUMSETS; i > 0; i = i - 1)begin
-                        cache[NUMSETS] <= cache[i-1];
+                // If The current FIFO isn't full
+                if(cache[NUMSETS-1][index] != 0)begin
+                    
+                    // Shifts through the current set with the size of the cache line to shift in FIFO order
+                    for(i = ASSOC; i > 0; i = i - 1)begin
+                        cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
                     end
                     
-                    cache[0] <= tag;
+                    // Insert new address at beginning of cache line
+                    cache[NUMSETS-1][0] <= tag;
                 end
                 
+                //If The current FIFO is full
+                else begin
+                    
+                    // Pop out last address out of cache before shifting
+                    cache[NUMSETS-1][index] <= 32'b0;
+                    
+                    // Shifts through the current set with the size of the cache line to shift in FIFO order
+                    for(i = ASSOC; i > 0; i = i - 1)begin
+                        cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
+                    end
+                    
+                    // Insert new address at beginning of cache line
+                    cache[NUMSETS-1][0] <= tag;
+                end
+                    
+                next_state <= DONE;
             end
             
             // LRU
