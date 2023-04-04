@@ -49,7 +49,8 @@ module cache_top(
   // Counter variables
   reg[7:0] num_misses, num_hits;
   reg      found;
-  integer i;
+  integer i, j;
+  
   // Replacement policy FSM | Combinational logic
   always@(*)begin
    
@@ -57,13 +58,7 @@ module cache_top(
         
         // Idle state for cache, keep cache state value the same
         IDLE:begin
-            if(cache_addr != 0)begin
-                next_state <= READ;
-            end
-            
-            else begin
-                next_state <= IDLE;
-            end
+            next_state <= (cache_addr != 0) ? READ:IDLE;
         end
         
         // Read in address to find tag, index, and block off-set
@@ -94,17 +89,9 @@ module cache_top(
                 else begin
                     num_misses = num_misses + 1;
                 end
-                // If The current FIFO isn't full
-                if(cache[NUMSETS-1][index] != 0)begin
-                    next_state <= SHIFTEMPTY;
-                end
-                
-                //If The current FIFO is full
-                else begin
-                    next_state <= SHIFTFULL;
-                end
-                    
-                next_state <= DONE;
+
+                // If The current FIFO isn't full or not, perform appropriate shifting
+                next_state <= (cache[NUMSETS-1][index] != 0) ? SHIFTEMPTY:SHIFTFULL;
             end
             
             // LRU
@@ -126,17 +113,8 @@ module cache_top(
                     num_misses = num_misses + 1;
                 end
 
-                // If The current LRU isn't full
-                if(cache[NUMSETS-1][index] != 0)begin
-                    next_state <= SHIFTEMPTY;
-                end
-                
-                //If The current LRU is full
-                else begin
-                    next_state <= SHIFTFULL;
-                end
-                    
-                next_state <= DONE;
+                // If The current LRU isn't full or not, perform appropriate shifting
+                next_state <= (cache[NUMSETS-1][index] != 0) ? SHIFTEMPTY:SHIFTFULL;
             end
             
         end
@@ -154,6 +132,7 @@ module cache_top(
                     
                 // Insert new address at beginning of cache line
                 cache[NUMSETS-1][0] <= tag;
+                next_state <= DONE;
         end
 
 
@@ -166,6 +145,7 @@ module cache_top(
 
                 // Insert new address at beginning of cache line
                 cache[NUMSETS-1][0] <= tag;
+                next_state <= DONE;
         end
         
         LRUHIT:begin
@@ -189,6 +169,12 @@ module cache_top(
         num_reads <= 8'b0;
         num_writes <= 8'b0;
         found <= 1'b0;
+
+        for(i = 0; i < NUMSETS; i = i + 1)begin
+            for(j = 0; j < ASSOC; j = j + 1)begin
+                cache[i][j] = 32'b0;
+            end
+        end
     end
     
     else begin
