@@ -36,18 +36,19 @@ module cache_top(
   parameter BLOCKSIZE = 64;
   parameter CACHESIZE = 32;
   parameter ASSOC = 8;
-  parameter  NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
+  parameter NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
   reg[31:0] index;         
   reg[31:0] tag;
   reg[31:0] cache [0:NUMSETS][0:ASSOC];
 
   
   // FSM Regs and Parameters
-  parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFT = 3, LRUHIT = 4, DONE = 5;
-  reg [3:0] state, next_state;
+  parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFTFULL = 3, SHIFTEMPTY = 4, LRUHIT = 5, DONE = 6;
+  reg[3:0] state, next_state;
   
   // Counter variables
-  reg [7:0] num_misses, num_hits;
+  reg[7:0] num_misses, num_hits;
+  reg      found;
   integer i;
   // Replacement policy FSM | Combinational logic
   always@(*)begin
@@ -77,32 +78,30 @@ module cache_top(
             
             // FIFO
             if(replace_policy == 0)begin
-                
+
+                for(i = 0; i < ASSOC; i = i + 1)begin
+                        
+                    if(tag == cache[NUMSETS-1][i])begin
+                        found <= 1'b1;
+                    end
+                end
+
+                if(found)begin
+                    num_hits = num_hits + 1;
+                    found <= 1'b0;
+                end
+
+                else begin
+                    num_misses = num_misses + 1;
+                end
                 // If The current FIFO isn't full
                 if(cache[NUMSETS-1][index] != 0)begin
-                    
-                    // Shifts through the current set with the size of the cache line to shift in FIFO order
-                    for(i = ASSOC; i > 0; i = i - 1)begin
-                        cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
-                    end
-                    
-                    // Insert new address at beginning of cache line
-                    cache[NUMSETS-1][0] <= tag;
+                    next_state <= SHIFTEMPTY;
                 end
                 
                 //If The current FIFO is full
                 else begin
-                    
-                    // Pop out last address out of cache before shifting
-                    cache[NUMSETS-1][index] <= 32'b0;
-                    
-                    // Shifts through the current set with the size of the cache line to shift in FIFO order
-                    for(i = ASSOC; i > 0; i = i - 1)begin
-                        cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
-                    end
-                    
-                    // Insert new address at beginning of cache line
-                    cache[NUMSETS-1][0] <= tag;
+                    next_state <= SHIFTFULL;
                 end
                     
                 next_state <= DONE;
@@ -111,16 +110,62 @@ module cache_top(
             // LRU
             else if(replace_policy == 1)begin
                 
-                /*if(hit)begin
+                for(i = 0; i < ASSOC; i = i + 1)begin        
+                if(tag == cache[NUMSETS-1][i])begin
+                        found <= 1'b1;
+                    end
+                end
+
+                if(found)begin
+                    num_hits = num_hits + 1;
+                    found <= 1'b0;
                     next_state <= LRUHIT;
-                end */
+                end
+
+                else begin
+                    num_misses = num_misses + 1;
+                end
+
+                // If The current LRU isn't full
+                if(cache[NUMSETS-1][index] != 0)begin
+                    next_state <= SHIFTEMPTY;
+                end
                 
+                //If The current LRU is full
+                else begin
+                    next_state <= SHIFTFULL;
+                end
+                    
+                next_state <= DONE;
             end
             
         end
         
-        // Write & Shift state  | Increment Reaads or Writes
-        SHIFT:begin
+        // Shift if current cache is Full FIFO or Full LRU Miss
+        SHIFTFULL:begin
+
+                // Pop out last address out of cache before shifting
+                cache[NUMSETS-1][index] <= 32'b0;
+                    
+                // Shifts through the current set with the size of the cache line to shift in FIFO order
+                for(i = ASSOC; i > 0; i = i - 1)begin
+                    cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
+                end
+                    
+                // Insert new address at beginning of cache line
+                cache[NUMSETS-1][0] <= tag;
+        end
+
+
+        SHIFTEMPTY:begin
+            
+                // Shifts through the current set with the size of the cache line to shift in FIFO order
+                for(i = ASSOC; i > 0; i = i - 1)begin
+                    cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
+                end
+
+                // Insert new address at beginning of cache line
+                cache[NUMSETS-1][0] <= tag;
         end
         
         LRUHIT:begin
@@ -129,7 +174,7 @@ module cache_top(
         // Finish Shift operations, calculate miss rate, and jump into ideal
         DONE:begin
             cache_miss_rate <= num_misses / (num_reads);
-            next_state <= state;
+            next_state <= IDLE;
         end
         
     endcase
@@ -143,11 +188,12 @@ module cache_top(
         num_hits <= 8'b0;
         num_reads <= 8'b0;
         num_writes <= 8'b0;
+        found <= 1'b0;
     end
     
     else begin
         state <= next_state;
     end
-  end
-    
+  end   
+
 endmodule
