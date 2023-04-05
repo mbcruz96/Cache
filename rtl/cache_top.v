@@ -26,21 +26,22 @@ module cache_top(
   input write_policy,
   input replace_policy,
   input[1:0] inclusion_policy,
-  input[31:0] cache_addr,
+  input[47:0] cache_addr,
   output reg[11:0] cache_miss_rate,
   output reg[11:0] num_reads,
-  output reg[11:0] num_writes
+  output reg[11:0] num_writes,
+  output reg[31:0] curr_tag
 );
   
   // Cache properties
   parameter BLOCKSIZE = 64;
-  parameter CACHESIZE = 32;
+  parameter CACHESIZE = 32768;
   parameter ASSOC = 8;
   parameter NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
   reg[31:0] index;         
   reg[31:0] tag;
   reg[31:0] cache [0:NUMSETS][0:ASSOC];
-
+  
   
   // FSM Regs and Parameters
   parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFTFULL = 3, SHIFTEMPTY = 4, LRUHIT = 5, DONE = 6;
@@ -48,8 +49,8 @@ module cache_top(
   
   // Counter variables
   reg[7:0] num_misses, num_hits;
-  reg found;
-  integer i, j, lru_index;
+  reg      found;
+  integer i, j;
   
   // Replacement policy FSM | Combinational logic
   always@(*)begin
@@ -65,6 +66,8 @@ module cache_top(
         READ:begin
             tag <= cache_addr / BLOCKSIZE;               // Current Tag address derived from the input cache address
             index <= (cache_addr / BLOCKSIZE) % NUMSETS; // Current Set that the tag will go into
+            //num_reads <= num_reads + 1;
+            curr_tag <= tag;
             next_state <= SEARCH;
         end
         
@@ -74,7 +77,6 @@ module cache_top(
             // FIFO
             if(replace_policy == 0)begin
 
-                // If the current tag exists within the cache and note that it was found
                 for(i = 0; i < ASSOC; i = i + 1)begin
                         
                     if(tag == cache[NUMSETS-1][i])begin
@@ -82,15 +84,13 @@ module cache_top(
                     end
                 end
 
-                // If the cache has been marked found, increment hits and set found back to default,
                 if(found)begin
                     num_hits = num_hits + 1;
                     found <= 1'b0;
                 end
 
-                // If not found in FIFO, increment misses    
                 else begin
-                    num_misses = num_misses + 1;
+                    num_misses <= num_misses + 1;
                 end
 
                 // If The current FIFO isn't full or not, perform appropriate shifting
@@ -100,23 +100,18 @@ module cache_top(
             // LRU
             else if(replace_policy == 1)begin
                 
-                // If the current tag exists within the cache, take track of the index, note that it was found, and clear that current index in cache
                 for(i = 0; i < ASSOC; i = i + 1)begin        
                 if(tag == cache[NUMSETS-1][i])begin
-                        lru_index = i;
                         found <= 1'b1;
-                        cache[NUMSETS-1][i] = 32'b0;
                     end
                 end
 
-                // If the cache has been marked found, increment hits, set found back to default, and proceed to LRUHIT state
                 if(found)begin
                     num_hits = num_hits + 1;
                     found <= 1'b0;
                     next_state <= LRUHIT;
                 end
 
-                // If not found in LRU, increment misses
                 else begin
                     num_misses = num_misses + 1;
                 end
@@ -143,7 +138,7 @@ module cache_top(
                 next_state <= DONE;
         end
 
-        // Shift cache if its not full
+
         SHIFTEMPTY:begin
             
                 // Shifts through the current set with the size of the cache line to shift in FIFO order
@@ -157,21 +152,11 @@ module cache_top(
         end
         
         LRUHIT:begin
-
-                // Begin shifting at the index tag the LRU recieved a hit at 
-                for(i = lru_index; i > 0; i = i - 1)begin
-                    cache[NUMSETS-1][i] <= cache[NUMSETS-1][i-1];
-                end
-
-                // Set tag to front of cache
-                cache[NUMSETS-1][0] <= tag;
-                next_state <= DONE;
-                
         end
         
-        // Finish Shift operations, calculate miss rate, and jump into idle
+        // Finish Shift operations, calculate miss rate, and jump into ideal
         DONE:begin
-            cache_miss_rate <= num_misses / (num_reads);
+            //cache_miss_rate <= num_misses / (num_reads);
             next_state <= IDLE;
         end
         
@@ -186,6 +171,7 @@ module cache_top(
         num_hits <= 8'b0;
         num_reads <= 8'b0;
         num_writes <= 8'b0;
+        cache_miss_rate <= 12'b0;
         found <= 1'b0;
 
         for(i = 0; i < NUMSETS; i = i + 1)begin
@@ -197,6 +183,13 @@ module cache_top(
     
     else begin
         state <= next_state;
+        if(next_state == READ)begin
+            num_reads = num_reads + 1;
+        end
+        
+        if(next_state == DONE)begin
+            cache_miss_rate <= num_misses / (num_reads);
+        end
     end
   end   
 
