@@ -21,14 +21,13 @@
 
 
 module cache_tb();
-    
     reg clk, reset;
     reg write_policy, replace_policy;
     reg[1:0] inclusion_policy;
     reg[47:0] cache_addr;
-    wire[11:0] cache_miss_rate, num_reads, num_writes;
+    wire[11:0] cache_miss_rate, num_reads, num_writes, num_misses, num_hits;
     wire[31:0] curr_tag;
-    
+
      cache_top UUT(
         .clk(clk), 
         .reset(reset), 
@@ -39,6 +38,8 @@ module cache_tb();
         .cache_miss_rate(cache_miss_rate),
         .num_reads(num_reads),
         .num_writes(num_writes),
+        .num_misses(num_misses),
+        .num_hits(num_hits),
         .curr_tag(curr_tag)
         );
         
@@ -48,14 +49,16 @@ module cache_tb();
         reset = 1;
         #10
         reset = 0;
-        cache_addr = 48'h0x7fff493822b0;
+        cache_addr = 48'h7fff493822b0;
         #10
-        cache_addr = 48'h0x7fff493822a8;
+        cache_addr = 48'h7fff493822a;
         #10
-        cache_addr = 48'h0x7f3035f6a7c0;
+        cache_addr = 48'h7f3035f6a7c0;
+        #10
+        cache_addr = 48'b0;
         
     end
     
-    always #5 clk = ~clk;
+    always #1 clk = ~clk;
 
 endmodule
