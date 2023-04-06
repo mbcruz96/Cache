@@ -27,6 +27,28 @@ module cache_tb();
     reg[47:0] cache_addr;
     wire[11:0] num_reads, num_writes, num_misses, num_hits;
     wire[31:0] curr_tag;
+    reg[47:0] test_addrs[0:19] = 
+    {   48'h7fff493822b8,
+        48'h0000006324d8,
+        48'h7fff493822b0,
+        48'h7fff493822a8,
+        48'h7fff493822a0,
+        48'h7fff49382298,
+        48'h7fff49382290,
+        48'h7fff49382288,
+        48'h7fff49382260,
+        48'h7fff49382248,
+        48'h7f3035f6f3b0,
+        48'h7fff49382240,
+        48'h7fff49382238,
+        48'h000000634600,
+        48'h7fff49382270,
+        48'h0fff49382278,
+        48'h7f3035f6a7c0,
+        48'h0000006346e0,
+        48'h7f3035f6a7c0,
+        48'h000000634628
+    };
     real miss_rate;
     real misses, reads;
      cache_top UUT(
@@ -42,20 +64,17 @@ module cache_tb();
         .num_hits(num_hits),
         .curr_tag(curr_tag)
         );
-        
+    integer i;
     initial begin
         replace_policy = 0;
         clk = 1;
         reset = 1;
         #10
         reset = 0;
-        cache_addr = 48'h7fff493822b0;
-        #10
-        cache_addr = 48'h7fff493822a8;
-        #10
-        cache_addr = 48'h7f3035f6a7c0;
-        #10
-        cache_addr = 48'b0;
+        for(i = 0; i < 20; i=i+1)begin
+            cache_addr = test_addrs[i];
+            #10;
+        end
         misses = num_misses;
         reads = num_reads;
         miss_rate = misses / reads;
