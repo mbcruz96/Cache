@@ -25,9 +25,13 @@ module cache_tb();
     reg write_policy, replace_policy;
     reg[1:0] inclusion_policy;
     reg[47:0] cache_addr;
+    reg[7:0] cache_op;
     wire[11:0] num_reads, num_writes, num_misses, num_hits;
     wire[31:0] curr_tag;
-    reg[47:0] test_addrs[0:19] = 
+    parameter SIZE = 20;
+    
+    // TODO: Make a larger test_addrs list (take from MINIFE.t or XSBENCH.t) | 100 entries
+    reg[47:0] test_addrs[0:SIZE-1] = 
     {   48'h7fff493822b8,
         48'h0000006324d8,
         48'h7fff493822b0,
@@ -49,9 +53,18 @@ module cache_tb();
         48'h7f3035f6a7c0,
         48'h000000634628
     };
+    
+    // TODO: Make a seperate test_ops list that will have R or W operations | 100 entries
+    /*reg[7:0] test_ops[0:SIZE] ={
+    
+        // 8'h57 = W
+        // 8'h52 = R
+    };*/
+    
+   
     real miss_rate;
-    real misses, reads;
-     cache_top UUT(
+    real misses, reads, hits;
+    cache_top UUT(
         .clk(clk), 
         .reset(reset), 
         .write_policy(write_policy), 
@@ -62,7 +75,8 @@ module cache_tb();
         .num_writes(num_writes),
         .num_misses(num_misses),
         .num_hits(num_hits),
-        .curr_tag(curr_tag)
+        .curr_tag(curr_tag),
+        .cache_op(cache_op)
         );
     integer i;
     initial begin
@@ -71,14 +85,18 @@ module cache_tb();
         reset = 1;
         #10
         reset = 0;
-        for(i = 0; i < 20; i=i+1)begin
+        
+        // TODO: Make cache_op = test_ops[i]
+        for(i = 0; i < SIZE; i=i+1)begin
             cache_addr = test_addrs[i];
             #10;
         end
         misses = num_misses;
         reads = num_reads;
-        miss_rate = misses / reads;
+        hits = num_hits;
+        miss_rate = misses / (hits+misses);
     end
+    
     always #1 clk = ~clk;
 
 endmodule

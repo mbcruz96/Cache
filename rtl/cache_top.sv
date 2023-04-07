@@ -27,11 +27,17 @@ module cache_top(
   input replace_policy,
   input[1:0] inclusion_policy,
   input[47:0] cache_addr,
+  input[7:0] cache_op,
   output reg[11:0] cache_miss_rate,
   output reg[11:0] num_reads, num_misses, num_hits,
   output reg[11:0] num_writes,
   output reg[31:0] curr_tag
 );
+
+  // write_policy: 0 -> write through | 1 -> write back                         IN-PROGRESS
+  // replace_policy: 0 -> FIFO | 1 -> LRU                                       DONE
+  // inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive     IN-PROGRESS
+  // cache_op: W or R                                                           IN-PROGRESS
   
   // Cache properties
   parameter BLOCKSIZE = 64;
