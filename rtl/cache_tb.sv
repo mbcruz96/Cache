@@ -54,14 +54,32 @@ module cache_tb();
         48'h000000634628
     };
     
-    // TODO: Make a seperate test_ops list that will have R or W operations | 100 entries
-    /*reg[7:0] test_ops[0:SIZE] ={
+    // TODO: Make a larger test_ops list (take from MINIFE.t or XSBENCH.t) | 100 entries
+    // 8'h57 = W
+    // 8'h52 = R
+    reg[7:0] test_ops[0:SIZE-1] =
+    {   8'h57,
+        8'h52,
+        8'h57,
+        8'h57,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h57,
+        8'h57,
+        8'h57,
+        8'h52,
+        8'h52,
+        8'h57,
+        8'h52,
+        8'h57,
+        8'h52,
+        8'h57,
+        8'h52,
+        8'h52
+    };
     
-        // 8'h57 = W
-        // 8'h52 = R
-    };*/
-    
-   
     real miss_rate;
     real misses, reads, hits;
     cache_top UUT(
@@ -81,14 +99,15 @@ module cache_tb();
     integer i;
     initial begin
         replace_policy = 0;
+        write_policy = 0;
         clk = 1;
         reset = 1;
         #10
         reset = 0;
-        
-        // TODO: Make cache_op = test_ops[i]
+                //send an addr and op from array to top module
         for(i = 0; i < SIZE; i=i+1)begin
             cache_addr = test_addrs[i];
+            cache_op = test_ops[i];
             #10;
         end
         misses = num_misses;
