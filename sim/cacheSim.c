@@ -1,51 +1,49 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include "ourHeaders.h"
 
-typedef struct CacheLevel {
+typedef struct CacheLevel
+{
     int level;
     int cacheSize;
     int associativity;
     int sets;
-}CacheLevel;
+} CacheLevel;
 
+int loadFile(int argc, char *argv[]);
 bool isPowerOfTwo(int x);
-void getInputs();
-void getSets();
-void printInputs();
+int getInputs();
+CacheLevel *getCache(int level);
+int getSets(int cacheSize, int associativity);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
+void printInputs(char *traceFile);
 
 // global variables for cache size, associativity, block size, and replacement policy
-int CAHCE_SIZE = -1;
-int ASSOCIATIVITY = -1;
+// int CAHCE_SIZE = -1;
+// int ASSOCIATIVITY = -1;
 int BLOCK_SIZE = -1;
 int REPLACEMENT_POLICY = -1;
 int INCLUSION_POLICY = -1;
-int NUM_SETS = -1;
+// int NUM_SETS = -1;
 int NUM_OF_CACHE_LEVELS = -1;
+FILE *INPUT_FILE = NULL;
+
+CacheLevel **MAIN_CACHE = NULL;
 
 // grab arguments from command line
 int main(int argc, char *argv[])
 {
-    // check for correct number of arguments
-    // this is left as a command line argument for 
-    // ease of use
-    if (argc != 2) {
-        printf("Usage: ./cacheSim <tracefile path>\n");
+    if (loadFile(argc, argv) == -1)
+    {
         return 1;
     }
-    // open file
-    FILE *file = fopen(argv[1], "r");
-    // check if file opened
-    if (file == NULL) {
-        printf("Could not open file.\n");
-        return 1;
+
+    while (getInputs() == -1)
+    {
+        printf(">>> Failed to get inputs\n");
     }
-    
-    // get inputs from user
-    getInputs();
-    getSets();
 
     // read file
     // char line[256];
@@ -53,172 +51,297 @@ int main(int argc, char *argv[])
     //     printf("%s", line);
     // }
 
-    printInputs();
+    printInputs(argv[1]);
 
     // close file
-    fclose(file);
-    
-    // call hello_world function from the header file
-    hello_world();
+    fclose(INPUT_FILE);
+
+    // this is in case someone whants to 
+    // experiment with header files
+    // hello_world();
+
+    return 0;
+}
+
+int loadFile(int argc, char *argv[])
+{
+    // check if there is a file path
+    if (argc != 2)
+    {
+        // we did it this way so we dont have to type out the whole thing
+        // every time we want to run the program
+        printf("Usage: ./cacheSim <tracefile path>\n");
+        return -1;
+    }
+
+    INPUT_FILE = fopen(argv[1], "r");
+
+    // check if file opened
+    if (INPUT_FILE == NULL)
+    {
+        printf("Could not open file.\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 // function to check if a number is a power of 2
-bool isPowerOfTwo(int x) {
+bool isPowerOfTwo(int x)
+{
     // 8 is 1000
-    // 7 is 0111, 
+    // 7 is 0111,
     // so 8 & 7 = 0
 
     // 7 is 0111
     // 6 is 0110
     // so 7 & 6 = 6 or essentiall not 0
-    
+
     return !(x & (x - 1));
 }
 
 // function to get the inputs from the user
-void getInputs() {
+int getInputs()
+{
     int inputSize = 256;
-    char input [inputSize];
+    char input[inputSize];
+
+    // Block Size
+    while (true)
+    {
+        printf("Block Size: \n");
+        if (fgets(input, inputSize, stdin) == NULL)
+        {
+            printf(">>> Failed to read Block Size\n");
+        }
+        // convert input string to int
+        BLOCK_SIZE = atoi(input);
+        // safeguard for bad input
+        if (BLOCK_SIZE <= 0)
+        {
+            printf(">>> Must be a positive integer greater than 1\n");
+        }
+        else if (!isPowerOfTwo(BLOCK_SIZE))
+        {
+            printf(">>> Must be a power of 2\n");
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    // Replacement Policy
+    while (true)
+    {
+        printf("Replacement policy?: \n    1:\tLRU\n    2:\tFIFO\n    3:\tOptimal\n");
+        if (fgets(input, inputSize, stdin) == NULL)
+        {
+            printf(">>> Failed to read Replacement Policy\n");
+        }
+        // convert input string to int
+        REPLACEMENT_POLICY = atoi(input);
+        // safeguard for bad input
+        if (REPLACEMENT_POLICY == 1 || REPLACEMENT_POLICY == 2 || REPLACEMENT_POLICY == 3)
+        {
+            break;
+        }
+        else
+        {
+            printf(">>> Invalid selection, must be 1, 2, or 3\n");
+        }
+    }
+
+    // Inclusion policy
+    while (true)
+    {
+        printf("Inclusion policy?: \n    1:\tInclusive\n    2:\tExclusive\n    3:\tNon-inclusive\n");
+        if (fgets(input, inputSize, stdin) == NULL)
+        {
+            printf(">>> Failed to read Inclusion Policy\n");
+        }
+        // convert input string to int
+        INCLUSION_POLICY = atoi(input);
+        // safeguard for bad input
+        if (INCLUSION_POLICY == 1 || INCLUSION_POLICY == 2 || INCLUSION_POLICY == 3)
+        {
+            break;
+        }
+        else
+        {
+            printf(">>> Invalid selection, must be 1 or 2\n");
+        }
+    }
+
+    // Amount of Levels
+    while (true)
+    {
+        printf("How many levels do you want your cache to be?: \n");
+        if (fgets(input, inputSize, stdin) == NULL)
+        {
+            printf(">>> Failed to read Inclusion Policy\n");
+        }
+        // convert input string to int
+        NUM_OF_CACHE_LEVELS = atoi(input);
+        // safeguard for bad input
+        if (NUM_OF_CACHE_LEVELS >= 1)
+        {
+            break;
+        }
+        else
+        {
+            printf(">>> Invalid selection, must be equal to or greater than 1\n");
+        }
+    }
+
+    // create cache
+    MAIN_CACHE = malloc(NUM_OF_CACHE_LEVELS * sizeof(CacheLevel *));
+
+    for (int i = 0; i < NUM_OF_CACHE_LEVELS; i++)
+    {
+        CacheLevel *newCacheLevel = getCache(i + 1);
+        if (newCacheLevel == NULL) 
+        {
+            // free cache since there was an error
+            free(MAIN_CACHE);
+            return -1;
+        }
+
+        MAIN_CACHE[i] = newCacheLevel;
+    }
+
+    // return zero if everything went well
+    return 0;
+}
+
+CacheLevel *getCache(int level)
+{
+    int inputSize = 256;
+    char input[inputSize];
+
+    int cacheSize = -1;
+    int associativity = -1;
+    int sets = -1;
 
     // CACHE SIZE
-    while (true) {
-        printf("Cache Size?: \n");
-        if (fgets (input, inputSize, stdin) == NULL) {
+    while (true)
+    {
+        printf("Cache Size for level %d: \n", level);
+        if (fgets(input, inputSize, stdin) == NULL)
+        {
             printf(">>> Failed to read Cache Size\n");
         }
         // convert input string to int
-        CAHCE_SIZE = atoi (input);
+        cacheSize = atoi(input);
         // safeguard for bad input
-        if (CAHCE_SIZE <= 0) {
+        if (cacheSize <= 0)
+        {
             printf(">>> Must be a positive integer greater than 1\n");
         }
-        else if (!isPowerOfTwo(CAHCE_SIZE)) {
+        else if (!isPowerOfTwo(cacheSize))
+        {
             printf(">>> Must be a power of 2\n");
         }
-        else {
+        else
+        {
             break;
         }
     }
     // Associativity
-    while (true) {
-        printf("Associativity: \n");
-        if (fgets (input, inputSize, stdin) == NULL) {
+    while (true)
+    {
+        printf("Associativity for level %d: \n", level);
+        if (fgets(input, inputSize, stdin) == NULL)
+        {
             printf(">>> Failed to read Associativity\n");
         }
         // convert input string to int
-        ASSOCIATIVITY = atoi (input);
+        associativity = atoi(input);
         // safeguard for bad input
-        if (ASSOCIATIVITY <= 0) {
+        if (associativity <= 0)
+        {
             printf(">>> Must be a positive integer greater than 1\n");
         }
-        else if (!isPowerOfTwo(ASSOCIATIVITY)) {
+        else if (!isPowerOfTwo(associativity))
+        {
             printf(">>> Must be a power of 2\n");
         }
-        else {
+        else
+        {
             break;
         }
     }
-    // Block Size
-    while (true) {
-        printf("Block Size: \n");
-        if (fgets (input, inputSize, stdin) == NULL) {
-            printf(">>> Failed to read Block Size\n");
-        }
-        // convert input string to int
-        BLOCK_SIZE = atoi (input);
-        // safeguard for bad input
-        if (BLOCK_SIZE <= 0) {
-            printf(">>> Must be a positive integer greater than 1\n");
-        }
-        else if (!isPowerOfTwo(BLOCK_SIZE)) {
-            printf(">>> Must be a power of 2\n");
-        }
-        else {
-            break;
-        }
-    }
-    // Replacement Policy
-    while (true) {
-        printf("Replacement policy?: \n    LRU = 1\n    FIFO = 2\n    Optimal = 3\n");
-        if (fgets (input, inputSize, stdin) == NULL) {
-            printf(">>> Failed to read Replacement Policy\n");
-        }
-        // convert input string to int
-        REPLACEMENT_POLICY = atoi (input);
-        // safeguard for bad input
-        if (REPLACEMENT_POLICY == 1 || REPLACEMENT_POLICY == 2 || REPLACEMENT_POLICY == 3) {
-            break;
-        }
-        else {
-            printf(">>> Invalid selection, must be 1, 2, or 3\n");
-        }
-    }
-    // Inclusion policy
-    while (true) {
-        printf("Inclusion policy?: \n    Inclusive = 1\n    Non-inclusive = 2\n");
-        if (fgets (input, inputSize, stdin) == NULL) {
-            printf(">>> Failed to read Inclusion Policy\n");
-        }
-        // convert input string to int
-        INCLUSION_POLICY = atoi (input);
-        // safeguard for bad input
-        if (INCLUSION_POLICY == 1 || INCLUSION_POLICY == 2) {
-            break;
-        }
-        else {
-            printf(">>> Invalid selection, must be 1 or 2\n");
-        }
-    }
-    
-}
 
-// function to get the number of sets
-void getSets() {
-    while (true) {
-        NUM_SETS = CAHCE_SIZE / (ASSOCIATIVITY * BLOCK_SIZE);
-        if (NUM_SETS > 0) {
-            break;
-        }
-        else {
-            printf(">>> Invalid input for Set calculations with: \nCache Size and/or\nBlock Size and/or\nAssociativity\n");
-            printf(">>> Cache Size must be greater than or equal \n    to the product of Associativity and Block Size\n");
-            printf(">>> Please re-enter the following values:\n");
+    // calculate sets
+    sets = cacheSize / (associativity * BLOCK_SIZE);
+    if (sets <= 0)
+    {
+        printf(">>> Invalid input for Set calculations with: \nCache Size and/or\nBlock Size and/or\nAssociativity\n");
+        printf(">>> Cache Size must be greater than or equal \n    to the product of Associativity and Block Size\n");
+        printf(">>> Please re-enter the following values:\n");
 
-            getInputs();
-        }
-    }
-}
-
-void printInputs() {
-    printf("Cache Size: %d\n", CAHCE_SIZE);
-    printf("Associativity: %d\n", ASSOCIATIVITY);
-    printf("Block Size: %d\n", BLOCK_SIZE);
-
-    if (REPLACEMENT_POLICY == 1) {
-        printf("Replacement policy: LRU\n");
-    }
-    else if (REPLACEMENT_POLICY == 2) {
-        printf("Replacement policy: FIFO\n");
-    }
-    else if (REPLACEMENT_POLICY == 3) {
-        printf("Replacement policy: Optimal\n");
+        // return null to signify error with input and sets not makeing sense
+        return NULL;
     }
 
-    if (INCLUSION_POLICY == 1) {
-        printf("Inclusion policy: Inclusive\n");
-    }
-    else if (INCLUSION_POLICY == 2) {
-        printf("Inclusion policy: Non-inclusive\n");
-    }
-    printf("Number of Sets: %d\n", NUM_SETS);
+    // create cache
+    CacheLevel *cache = malloc(sizeof(CacheLevel));
+    cache = createCacheLevel(level, cacheSize, associativity, sets);
+    return cache;
 }
 
 // A utility function to create a cache level
-CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets) {
+CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets)
+{
     CacheLevel *cache = (CacheLevel *)malloc(sizeof(CacheLevel));
     cache->level = level;
     cache->cacheSize = cacheSize;
     cache->associativity = associativity;
     cache->sets = numSets;
     return cache;
+}
+
+void printInputs(char *traceFile)
+{
+    printf("===== Simulator configuration =====\n");
+    printf("BLOCKSIZE:\t\t%d\n", BLOCK_SIZE);
+
+    for (int i = 0; i < NUM_OF_CACHE_LEVELS; i++)
+    {
+        printf("L%d_SIZE:\t\t%d\n", MAIN_CACHE[i]->level, MAIN_CACHE[i]->cacheSize);
+        printf("L%d_ASSOC:\t\t%d\n", MAIN_CACHE[i]->level, MAIN_CACHE[i]->associativity);
+    }
+
+    if (REPLACEMENT_POLICY == 1)
+    {
+        printf("REPLACEMENT POLICY:\tLRU\n");
+    }
+    else if (REPLACEMENT_POLICY == 2)
+    {
+        printf("REPLACEMENT POLICY:\tFIFO\n");
+    }
+    else if (REPLACEMENT_POLICY == 3)
+    {
+        printf("REPLACEMENT POLICY:\tOptimal\n");
+    }
+
+    if (INCLUSION_POLICY == 1)
+    {
+        printf("INCLUSION PROPERTY:\tInclusive\n");
+    }
+    else if (INCLUSION_POLICY == 2)
+    {
+        // Exclusive
+        printf("INCLUSION PROPERTY:\tNon-inclusive\n");
+    }
+    else if (INCLUSION_POLICY == 2)
+    {
+        printf("INCLUSION PROPERTY:\tExclusive\n");
+    }
+    else if (INCLUSION_POLICY == 3)
+    {
+        // Exclusive
+        printf("INCLUSION PROPERTY:\tNon-inclusive\n");
+    }
+    printf("trace_file:\t\t%s\n", traceFile);
 }
