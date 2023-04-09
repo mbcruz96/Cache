@@ -6,12 +6,15 @@
 // prototype for is power of 2 function
 bool isPowerOfTwo(int x);
 void getInputs();
+void getSets();
 
 // global variables for cache size, associativity, block size, and replacement policy
 int CAHCE_SIZE = -1;
 int ASSOCIATIVITY = -1;
 int BLOCK_SIZE = -1;
 int REPLACEMENT_POLICY = -1;
+int INCLUSION_POLICY = -1;
+int NUM_SETS = -1;
 
 // grab arguments from command line
 int main(int argc, char *argv[])
@@ -19,37 +22,32 @@ int main(int argc, char *argv[])
     // check for correct number of arguments
     // this is left as a command line argument for 
     // ease of use
-    if (argc != 2)
-    {
+    if (argc != 2) {
         printf("Usage: ./cacheSim <tracefile path>\n");
         return 1;
     }
     // open file
     FILE *file = fopen(argv[1], "r");
     // check if file opened
-    if (file == NULL)
-    {
+    if (file == NULL) {
         printf("Could not open file.\n");
         return 1;
     }
-
-    // TODO: add in safeguards for bad input, 
-    //  blocksizes that are not powers of 2
     
     // get inputs from user
     getInputs();
 
     // read file
     // char line[256];
-    // while (fgets(line, sizeof(line), file))
-    // {
+    // while (fgets(line, sizeof(line), file)) {
     //     printf("%s", line);
     // }
 
-    // print out the input
-    printf("SIZE: %d\n", CAHCE_SIZE);
-    printf("ASSOC: %d\n", ASSOCIATIVITY);
-    printf("BLOCKSIZE: %d\n", BLOCK_SIZE);
+    // print out the input for debugging for now
+    printf("Cache Size: %d\n", CAHCE_SIZE);
+    printf("Associativity: %d\n", ASSOCIATIVITY);
+    printf("Block Size: %d\n", BLOCK_SIZE);
+
     if (REPLACEMENT_POLICY == 1) {
         printf("Replacement policy: LRU\n");
     }
@@ -59,6 +57,16 @@ int main(int argc, char *argv[])
     else if (REPLACEMENT_POLICY == 3) {
         printf("Replacement policy: Optimal\n");
     }
+
+    if (INCLUSION_POLICY == 1) {
+        printf("Inclusion policy: Inclusive\n");
+    }
+    else if (INCLUSION_POLICY == 2) {
+        printf("Inclusion policy: Non-inclusive\n");
+    }
+
+    getSets();
+    printf("Number of Sets: %d\n", NUM_SETS);
 
     // close file
     fclose(file);
@@ -87,8 +95,7 @@ void getInputs() {
     char input [inputSize];
 
     // CACHE SIZE
-    while (true)
-    {
+    while (true) {
         printf("Cache Size?: \n");
         if (fgets (input, inputSize, stdin) == NULL) {
             printf(">>> Failed to read Cache Size\n");
@@ -107,8 +114,7 @@ void getInputs() {
         }
     }
     // Associativity
-    while (true)
-    {
+    while (true) {
         printf("Associativity: \n");
         if (fgets (input, inputSize, stdin) == NULL) {
             printf(">>> Failed to read Associativity\n");
@@ -127,8 +133,7 @@ void getInputs() {
         }
     }
     // Block Size
-    while (true)
-    {
+    while (true) {
         printf("Block Size: \n");
         if (fgets (input, inputSize, stdin) == NULL) {
             printf(">>> Failed to read Block Size\n");
@@ -146,9 +151,9 @@ void getInputs() {
             break;
         }
     }
-    while (true)
-    {
-        printf("Replacement policy?: \nLRU = 1\nFIFO = 2\nOptimal = 3\n");
+    // Replacement Policy
+    while (true) {
+        printf("Replacement policy?: \n    LRU = 1\n    FIFO = 2\n    Optimal = 3\n");
         if (fgets (input, inputSize, stdin) == NULL) {
             printf(">>> Failed to read Replacement Policy\n");
         }
@@ -160,6 +165,40 @@ void getInputs() {
         }
         else {
             printf(">>> Invalid selection, must be 1, 2, or 3\n");
+        }
+    }
+    // Inclusion policy
+    while (true) {
+        printf("Inclusion policy?: \n    Inclusive = 1\n    Non-inclusive = 2\n");
+        if (fgets (input, inputSize, stdin) == NULL) {
+            printf(">>> Failed to read Inclusion Policy\n");
+        }
+        // convert input string to int
+        INCLUSION_POLICY = atoi (input);
+        // safeguard for bad input
+        if (INCLUSION_POLICY == 1 || INCLUSION_POLICY == 2) {
+            break;
+        }
+        else {
+            printf(">>> Invalid selection, must be 1 or 2\n");
+        }
+    }
+    
+}
+
+// function to get the number of sets
+void getSets() {
+    while (true) {
+        NUM_SETS = CAHCE_SIZE / (ASSOCIATIVITY * BLOCK_SIZE);
+        if (NUM_SETS > 0) {
+            break;
+        }
+        else {
+            printf(">>> Invalid input for Set calculations with: \nCache Size and/or\nBlock Size and/or\nAssociativity\n");
+            printf(">>> Cache Size must be greater than or equal \n    to the product of Associativity and Block Size\n");
+            printf(">>> Please re-enter the following values:\n");
+
+            getInputs();
         }
     }
 }
