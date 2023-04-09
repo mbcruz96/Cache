@@ -7,6 +7,7 @@
 bool isPowerOfTwo(int x);
 void getInputs();
 void getSets();
+void printInputs();
 
 // global variables for cache size, associativity, block size, and replacement policy
 int CAHCE_SIZE = -1;
@@ -36,6 +37,7 @@ int main(int argc, char *argv[])
     
     // get inputs from user
     getInputs();
+    getSets();
 
     // read file
     // char line[256];
@@ -43,30 +45,7 @@ int main(int argc, char *argv[])
     //     printf("%s", line);
     // }
 
-    // print out the input for debugging for now
-    printf("Cache Size: %d\n", CAHCE_SIZE);
-    printf("Associativity: %d\n", ASSOCIATIVITY);
-    printf("Block Size: %d\n", BLOCK_SIZE);
-
-    if (REPLACEMENT_POLICY == 1) {
-        printf("Replacement policy: LRU\n");
-    }
-    else if (REPLACEMENT_POLICY == 2) {
-        printf("Replacement policy: FIFO\n");
-    }
-    else if (REPLACEMENT_POLICY == 3) {
-        printf("Replacement policy: Optimal\n");
-    }
-
-    if (INCLUSION_POLICY == 1) {
-        printf("Inclusion policy: Inclusive\n");
-    }
-    else if (INCLUSION_POLICY == 2) {
-        printf("Inclusion policy: Non-inclusive\n");
-    }
-
-    getSets();
-    printf("Number of Sets: %d\n", NUM_SETS);
+    printInputs();
 
     // close file
     fclose(file);
@@ -76,8 +55,7 @@ int main(int argc, char *argv[])
 }
 
 // function to check if a number is a power of 2
-bool isPowerOfTwo(int x)
-{
+bool isPowerOfTwo(int x) {
     // 8 is 1000
     // 7 is 0111, 
     // so 8 & 7 = 0
@@ -201,4 +179,28 @@ void getSets() {
             getInputs();
         }
     }
+}
+
+void printInputs() {
+    printf("Cache Size: %d\n", CAHCE_SIZE);
+    printf("Associativity: %d\n", ASSOCIATIVITY);
+    printf("Block Size: %d\n", BLOCK_SIZE);
+
+    if (REPLACEMENT_POLICY == 1) {
+        printf("Replacement policy: LRU\n");
+    }
+    else if (REPLACEMENT_POLICY == 2) {
+        printf("Replacement policy: FIFO\n");
+    }
+    else if (REPLACEMENT_POLICY == 3) {
+        printf("Replacement policy: Optimal\n");
+    }
+
+    if (INCLUSION_POLICY == 1) {
+        printf("Inclusion policy: Inclusive\n");
+    }
+    else if (INCLUSION_POLICY == 2) {
+        printf("Inclusion policy: Non-inclusive\n");
+    }
+    printf("Number of Sets: %d\n", NUM_SETS);
 }
