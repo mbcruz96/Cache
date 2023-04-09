@@ -3,11 +3,18 @@
 #include <stdlib.h>
 #include "ourHeaders.h"
 
-// prototype for is power of 2 function
+typedef struct CacheLevel {
+    int level;
+    int cacheSize;
+    int associativity;
+    int sets;
+}CacheLevel;
+
 bool isPowerOfTwo(int x);
 void getInputs();
 void getSets();
 void printInputs();
+CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 
 // global variables for cache size, associativity, block size, and replacement policy
 int CAHCE_SIZE = -1;
@@ -16,6 +23,7 @@ int BLOCK_SIZE = -1;
 int REPLACEMENT_POLICY = -1;
 int INCLUSION_POLICY = -1;
 int NUM_SETS = -1;
+int NUM_OF_CACHE_LEVELS = -1;
 
 // grab arguments from command line
 int main(int argc, char *argv[])
@@ -203,4 +211,14 @@ void printInputs() {
         printf("Inclusion policy: Non-inclusive\n");
     }
     printf("Number of Sets: %d\n", NUM_SETS);
+}
+
+// A utility function to create a cache level
+CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets) {
+    CacheLevel *cache = (CacheLevel *)malloc(sizeof(CacheLevel));
+    cache->level = level;
+    cache->cacheSize = cacheSize;
+    cache->associativity = associativity;
+    cache->sets = numSets;
+    return cache;
 }
