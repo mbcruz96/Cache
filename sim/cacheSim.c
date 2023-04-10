@@ -15,18 +15,16 @@ typedef struct CacheLevel
 int loadFile(int argc, char *argv[]);
 bool isPowerOfTwo(int x);
 int getInputs();
-CacheLevel *getCache(int level);
+CacheLevel *getCacheLevel(int level);
 int getSets(int cacheSize, int associativity);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 void printInputs(char *traceFile);
+void printCache();
 
-// global variables for cache size, associativity, block size, and replacement policy
-// int CAHCE_SIZE = -1;
-// int ASSOCIATIVITY = -1;
+// global variables
 int BLOCK_SIZE = -1;
 int REPLACEMENT_POLICY = -1;
 int INCLUSION_POLICY = -1;
-// int NUM_SETS = -1;
 int NUM_OF_CACHE_LEVELS = -1;
 FILE *INPUT_FILE = NULL;
 
@@ -35,22 +33,27 @@ CacheLevel **MAIN_CACHE = NULL;
 // grab arguments from command line
 int main(int argc, char *argv[])
 {
+    // load file, -1 means error
     if (loadFile(argc, argv) == -1)
     {
         return 1;
     }
 
+    // get inputs from user, -1 means error
     while (getInputs() == -1)
     {
-        printf(">>> Failed to get inputs\n");
+        printf(">>> Failed to get inputs, please retry\n");
     }
 
-    // read file
-    // char line[256];
-    // while (fgets(line, sizeof(line), file)) {
-    //     printf("%s", line);
-    // }
+    // read file for debuging
+    char line[256];
+    while (fgets(line, sizeof(line), INPUT_FILE)) {
+        printf("%s", line);
+    }
 
+    // print the raw chache structs for debuging
+    printCache();
+    
     printInputs(argv[1]);
 
     // close file
@@ -114,8 +117,10 @@ int getInputs()
         {
             printf(">>> Failed to read Block Size\n");
         }
+
         // convert input string to int
         BLOCK_SIZE = atoi(input);
+
         // safeguard for bad input
         if (BLOCK_SIZE <= 0)
         {
@@ -139,8 +144,10 @@ int getInputs()
         {
             printf(">>> Failed to read Replacement Policy\n");
         }
+
         // convert input string to int
         REPLACEMENT_POLICY = atoi(input);
+
         // safeguard for bad input
         if (REPLACEMENT_POLICY == 1 || REPLACEMENT_POLICY == 2 || REPLACEMENT_POLICY == 3)
         {
@@ -160,8 +167,10 @@ int getInputs()
         {
             printf(">>> Failed to read Inclusion Policy\n");
         }
+
         // convert input string to int
         INCLUSION_POLICY = atoi(input);
+
         // safeguard for bad input
         if (INCLUSION_POLICY == 1 || INCLUSION_POLICY == 2 || INCLUSION_POLICY == 3)
         {
@@ -181,8 +190,10 @@ int getInputs()
         {
             printf(">>> Failed to read Inclusion Policy\n");
         }
+
         // convert input string to int
         NUM_OF_CACHE_LEVELS = atoi(input);
+
         // safeguard for bad input
         if (NUM_OF_CACHE_LEVELS >= 1)
         {
@@ -194,12 +205,12 @@ int getInputs()
         }
     }
 
-    // create cache
+    // create MAIN_CACHE
     MAIN_CACHE = malloc(NUM_OF_CACHE_LEVELS * sizeof(CacheLevel *));
 
     for (int i = 0; i < NUM_OF_CACHE_LEVELS; i++)
     {
-        CacheLevel *newCacheLevel = getCache(i + 1);
+        CacheLevel *newCacheLevel = getCacheLevel(i + 1);
         if (newCacheLevel == NULL) 
         {
             // free cache since there was an error
@@ -214,7 +225,7 @@ int getInputs()
     return 0;
 }
 
-CacheLevel *getCache(int level)
+CacheLevel *getCacheLevel(int level)
 {
     int inputSize = 256;
     char input[inputSize];
@@ -231,8 +242,10 @@ CacheLevel *getCache(int level)
         {
             printf(">>> Failed to read Cache Size\n");
         }
+
         // convert input string to int
         cacheSize = atoi(input);
+
         // safeguard for bad input
         if (cacheSize <= 0)
         {
@@ -255,8 +268,10 @@ CacheLevel *getCache(int level)
         {
             printf(">>> Failed to read Associativity\n");
         }
+
         // convert input string to int
         associativity = atoi(input);
+
         // safeguard for bad input
         if (associativity <= 0)
         {
@@ -304,14 +319,17 @@ CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int nu
 void printInputs(char *traceFile)
 {
     printf("===== Simulator configuration =====\n");
+    // Block size
     printf("BLOCKSIZE:\t\t%d\n", BLOCK_SIZE);
 
+    // Cache specific prints
     for (int i = 0; i < NUM_OF_CACHE_LEVELS; i++)
     {
         printf("L%d_SIZE:\t\t%d\n", MAIN_CACHE[i]->level, MAIN_CACHE[i]->cacheSize);
         printf("L%d_ASSOC:\t\t%d\n", MAIN_CACHE[i]->level, MAIN_CACHE[i]->associativity);
     }
 
+    // Replacement Policy
     if (REPLACEMENT_POLICY == 1)
     {
         printf("REPLACEMENT POLICY:\tLRU\n");
@@ -325,14 +343,10 @@ void printInputs(char *traceFile)
         printf("REPLACEMENT POLICY:\tOptimal\n");
     }
 
+    // Inclusion Policy
     if (INCLUSION_POLICY == 1)
     {
         printf("INCLUSION PROPERTY:\tInclusive\n");
-    }
-    else if (INCLUSION_POLICY == 2)
-    {
-        // Exclusive
-        printf("INCLUSION PROPERTY:\tNon-inclusive\n");
     }
     else if (INCLUSION_POLICY == 2)
     {
@@ -340,8 +354,24 @@ void printInputs(char *traceFile)
     }
     else if (INCLUSION_POLICY == 3)
     {
-        // Exclusive
         printf("INCLUSION PROPERTY:\tNon-inclusive\n");
     }
+    
+    // Trace File
     printf("trace_file:\t\t%s\n", traceFile);
+
+    printf("----------------------------------------\n");
+}
+
+void printCache()
+{
+    // print the main cache to check if it works
+    for (int i = 0; i < NUM_OF_CACHE_LEVELS; i++)
+    {
+        printf("Level: %d, Cache Size: %d, Associativity: %d, Sets: %d\n", 
+            MAIN_CACHE[i]->level, 
+            MAIN_CACHE[i]->cacheSize, 
+            MAIN_CACHE[i]->associativity, 
+            MAIN_CACHE[i]->sets);
+    }
 }
