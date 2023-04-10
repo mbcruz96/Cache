@@ -28,6 +28,7 @@ module cache_tb();
     reg[7:0] cache_op;
     wire[11:0] num_reads, num_writes, num_misses, num_hits;
     wire[31:0] curr_tag;
+    reg[11:0] curr_set;
     parameter SIZE = 20;
     
     // TODO: Make a larger test_addrs list (take from MINIFE.t or XSBENCH.t) | 100 entries
@@ -81,7 +82,7 @@ module cache_tb();
     };
     
     real miss_rate;
-    real misses, reads, hits;
+    real misses, reads, hits, writes;
     cache_top UUT(
         .clk(clk), 
         .reset(reset), 
@@ -94,11 +95,12 @@ module cache_tb();
         .num_misses(num_misses),
         .num_hits(num_hits),
         .curr_tag(curr_tag),
-        .cache_op(cache_op)
+        .cache_op(cache_op),
+        .curr_set(curr_set)
         );
     integer i;
     initial begin
-        replace_policy = 0;
+        replace_policy = 1;
         write_policy = 0;
         clk = 1;
         reset = 1;
@@ -113,6 +115,7 @@ module cache_tb();
         misses = num_misses;
         reads = num_reads;
         hits = num_hits;
+        writes = num_writes;
         miss_rate = misses / (hits+misses);
     end
     
