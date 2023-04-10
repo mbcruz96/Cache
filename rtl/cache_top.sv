@@ -28,6 +28,7 @@ module cache_top(
   input[1:0] inclusion_policy,
   input[47:0] cache_addr,
   input[7:0] cache_op,
+  input cache_lvl,
   output reg[11:0] cache_miss_rate,
   output reg[11:0] num_reads, num_misses, num_hits,
   output reg[11:0] num_writes,
@@ -38,18 +39,26 @@ module cache_top(
   // write_policy: 0 -> write through | 1 -> write back                         DONE
   // replace_policy: 0 -> FIFO | 1 -> LRU                                       DONE
   // inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive     IN-PROGRESS
-  // cache_op: W or R                                                           DONE
+  // cache_op: W or R
   
-  // Cache properties
   parameter BLOCKSIZE = 64;
-  parameter CACHESIZE = 32768;
-  parameter ASSOC = 8;
-  parameter NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
-  reg[31:0] index;         
-  reg[31:0] tag;
-  reg[31:0] cache [0:NUMSETS][0:ASSOC];
-  
-  
+
+  //L1 Cache properties
+  parameter L1_CACHESIZE = 8192;
+  parameter L1_ASSOC = 2;
+  parameter L1_NUMSETS = L1_CACHESIZE/(BLOCKSIZE * L1_ASSOC);
+  reg[31:0] L1_index;         
+  reg[31:0] L1_tag;
+  reg[31:0] L1_cache [0:L1_NUMSETS][0:L1_ASSOC];
+
+  //L2 Cache properties
+  parameter L2_CACHESIZE = 16384;
+  parameter L2_ASSOC = 4;
+  parameter L2_NUMSETS = L2_CACHESIZE/(BLOCKSIZE * L2_ASSOC);
+  reg[31:0] L2_index;         
+  reg[31:0] L2_tag;
+  reg[31:0] L2_cache [0:L2_NUMSETS][0:L2_ASSOC];
+
   // FSM Regs and Parameters
   parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFTFULL = 3, SHIFTEMPTY = 4, LRUHIT = 5, DONE = 6;
   reg[3:0] state, next_state;
@@ -71,10 +80,22 @@ module cache_top(
         
         // Read in address to find tag, index, and block off-set
         READ:begin
-            tag <= cache_addr / BLOCKSIZE;               // Current Tag address derived from the input cache address
-            index <= (cache_addr / BLOCKSIZE) % NUMSETS; // Current Set that the tag will go into
-            curr_tag <= tag;
-            curr_set <= index;
+
+            // L1 Cache input
+            if(cache_lvl)begin
+                L1_tag <= cache_addr / L1_BLOCKSIZE;               // Current Tag address derived from the input cache address
+                L1_index <= (cache_addr / L1_BLOCKSIZE) % L1_NUMSETS; // Current Set that the tag will go into
+                curr_tag <= L1_tag;
+                curr_set <= L1_index;
+            end
+
+            // L2 Cache input
+            else begin
+                L2_tag <= cache_addr / L2_BLOCKSIZE;               // Current Tag address derived from the input cache address
+                L2_index <= (cache_addr / L2_BLOCKSIZE) % L2_NUMSETS; // Current Set that the tag will go into
+                curr_tag <= L1_tag;
+                curr_set <= L1_index;
+            end
             next_state <= SEARCH;
         end
         

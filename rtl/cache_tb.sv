@@ -26,12 +26,13 @@ module cache_tb();
     reg[1:0] inclusion_policy;
     reg[47:0] cache_addr;
     reg[7:0] cache_op;
+    reg cache_lvl;
     wire[11:0] num_reads, num_writes, num_misses, num_hits;
     wire[31:0] curr_tag;
     reg[11:0] curr_set;
     parameter SIZE = 20;
     
-    // TODO: Make a larger test_addrs list (take from MINIFE.t or XSBENCH.t) | 100 entries
+    // Test Addresses
     reg[47:0] test_addrs[0:SIZE-1] = 
     {   48'h7fff493822b8,
         48'h0000006324d8,
@@ -55,7 +56,7 @@ module cache_tb();
         48'h000000634628
     };
     
-    // TODO: Make a larger test_ops list (take from MINIFE.t or XSBENCH.t) | 100 entries
+    // Test operations
     // 8'h57 = W
     // 8'h52 = R
     reg[7:0] test_ops[0:SIZE-1] =
@@ -80,6 +81,9 @@ module cache_tb();
         8'h52,
         8'h52
     };
+
+    // TODO: Add test which level will be accessed
+    reg test_cache_lvl[0:SIZE-1]={};
     
     real miss_rate;
     real misses, reads, hits, writes;
@@ -110,6 +114,7 @@ module cache_tb();
         for(i = 0; i < SIZE; i=i+1)begin
             cache_addr = test_addrs[i];
             cache_op = test_ops[i];
+            cache_lvl = test_cache_lvl[i];
             #10;
         end
         misses = num_misses;
