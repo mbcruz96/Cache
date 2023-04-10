@@ -12,6 +12,22 @@ typedef struct CacheLevel
     int sets;
 } CacheLevel;
 
+typedef struct Block
+{
+    int validBit = 0;
+    int dirtyBit = 0;
+    
+    int tag;
+    int LRU;
+    int offset;
+} Block;
+
+// typedef struct Set
+// {
+//     Block *blocks;
+//     int index;
+// } Set;
+
 int loadFile(int argc, char *argv[]);
 bool isPowerOfTwo(int x);
 int getInputs();
@@ -49,11 +65,52 @@ int main(int argc, char *argv[])
     char line[256];
     while (fgets(line, sizeof(line), INPUT_FILE)) {
         printf("%s", line);
+        // check if read or write
+        // if read
+            // check the hash map for the tag and is valid
+            // if it is in the hash map
+                // if its in the map for L1 cache
+                    // update the LRU
+                        // move to the front of the linked list
+                    // update the hit counter
+                // else  check L2 cache
+                    // update the miss counter
+                    // update the LRU
+                        // move to the front of the linked list
+                    // update the hash map
+                    // update the hit counter
+                // else not found
+                    // update the miss counter for all previous caches
+                    // create a new block
+                    // depending on the inclusion policy
+                        // if inclusive
+                            // update the LRU
+                                // move to the front of the linked list
+                            // update the hash map
+                            // update the hash map of all caches
+                            // if L1 is full evict the LRU block
+                        // if non-inclusive
+                            // update the LRU
+                                // move to the front of the linked list
+                            // update the hash map of only L1
+                            // if L1 is full evict the LRU block into next level
+                                // update the hash map of all caches
+        // if write 
+            // do all the same shit
+            // update the dirty bit to 1
+
+        // when evecting 
+            // check the dirty bit
+                // this would determin if we put it back to mem or discar, may not apply to us
+
+        // we will need 3 evict policies lru, fifo, and optimal
+
+                    
     }
 
     // print the raw chache structs for debuging
     printCache();
-    
+
     printInputs(argv[1]);
 
     // close file
