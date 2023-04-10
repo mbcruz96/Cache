@@ -31,13 +31,14 @@ module cache_top(
   output reg[11:0] cache_miss_rate,
   output reg[11:0] num_reads, num_misses, num_hits,
   output reg[11:0] num_writes,
-  output reg[31:0] curr_tag
+  output reg[31:0] curr_tag,
+  output reg[11:0] curr_set
 );
 
-  // write_policy: 0 -> write through | 1 -> write back                         IN-PROGRESS
+  // write_policy: 0 -> write through | 1 -> write back                         DONE
   // replace_policy: 0 -> FIFO | 1 -> LRU                                       DONE
   // inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive     IN-PROGRESS
-  // cache_op: W or R                                                           IN-PROGRESS
+  // cache_op: W or R                                                           DONE
   
   // Cache properties
   parameter BLOCKSIZE = 64;
@@ -73,6 +74,7 @@ module cache_top(
             tag <= cache_addr / BLOCKSIZE;               // Current Tag address derived from the input cache address
             index <= (cache_addr / BLOCKSIZE) % NUMSETS; // Current Set that the tag will go into
             curr_tag <= tag;
+            curr_set <= index;
             next_state <= SEARCH;
         end
         
@@ -174,7 +176,7 @@ module cache_top(
                 
                 // If tag found in cache, mark as found and mark LRU tag index
                 for(i = 0; i < ASSOC; i = i + 1)begin        
-                if(tag == cache[index][ASSOC])begin
+                if(tag == cache[index][i])begin
                         found <= 1'b1;
                         lru_index <= i;
                     end
