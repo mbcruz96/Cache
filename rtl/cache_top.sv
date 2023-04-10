@@ -84,7 +84,7 @@ module cache_top(
                 next_state <= (cache[index][ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
             end
 
-            // LRU | If cache hit, go to LRUHIT logic, if cache miss  proceed with FIFO-like shifitng
+            // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
             else
                 next_state <= (found) ? LRUHIT:(cache[index][ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
         end
@@ -131,7 +131,10 @@ module cache_top(
         
         // If an address has been read, increment reads, get tag & index for FSM
         if(next_state == READ)begin
-            num_reads = num_reads + 1;
+            // If write through & W operation increment writes
+            if(write_policy == 0 && cache_op == 8'h57)begin
+                num_writes = num_writes + 1;
+            end
         end
         
         // Search for the tag within the current replacement policy, write policy, and inclusion policy
@@ -154,9 +157,15 @@ module cache_top(
                     found <= 1'b0;
                 end
 
-                // If tag is not found, increment misses
+                // If tag is not found, increment misses and reads
                 else begin
                     num_misses <= num_misses + 1;
+                    num_reads = num_reads + 1;
+                    
+                    // If write back & W operation increment writes
+                    if(write_policy == 1 && cache_op == 7'h57)begin
+                        num_writes = num_writes + 1;
+                    end
                 end
             end
             
@@ -177,9 +186,15 @@ module cache_top(
                     found <= 1'b0;
                 end
 
-                // If not found, increment misses
+                // If not found, increment misses and reads
                 else begin
                     num_misses = num_misses + 1;
+                    num_reads = num_reads + 1;
+                    
+                    // If write back & W operation increment writes
+                    if(write_policy == 1 && cache_op == 8'h57)begin
+                        num_writes = num_writes + 1;
+                    end
                 end
             end
                        
@@ -213,7 +228,7 @@ module cache_top(
                 cache[index][0] <= tag;
         end
 
-        // Shfit logic for LRU hit
+        // Shift logic for LRU hit
         else if(next_state == LRUHIT)begin
 
                 // Pop out LRU hit tag out of cache before shifting
