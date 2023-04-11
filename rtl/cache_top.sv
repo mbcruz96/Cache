@@ -28,6 +28,7 @@ module cache_top(
   input[1:0] inclusion_policy,
   input[47:0] cache_addr,
   input[7:0] cache_op,
+  input cache_lvl,
   output reg[11:0] cache_miss_rate,
   output reg[11:0] num_reads, num_misses, num_hits,
   output reg[11:0] num_writes,
@@ -38,18 +39,26 @@ module cache_top(
   // write_policy: 0 -> write through | 1 -> write back                         DONE
   // replace_policy: 0 -> FIFO | 1 -> LRU                                       DONE
   // inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive     IN-PROGRESS
-  // cache_op: W or R                                                           DONE
+  // cache_op: W or R
   
-  // Cache properties
   parameter BLOCKSIZE = 64;
-  parameter CACHESIZE = 32768;
-  parameter ASSOC = 8;
-  parameter NUMSETS = CACHESIZE/(BLOCKSIZE * ASSOC);
-  reg[31:0] index;         
-  reg[31:0] tag;
-  reg[31:0] cache [0:NUMSETS][0:ASSOC];
-  
-  
+
+  //L1 Cache properties
+  parameter L1_CACHESIZE = 8192;
+  parameter L1_ASSOC = 2;
+  parameter L1_NUMSETS = L1_CACHESIZE/(BLOCKSIZE * L1_ASSOC);
+  reg[31:0] L1_index;         
+  reg[31:0] L1_tag;
+  reg[31:0] L1_cache [0:L1_NUMSETS][0:L1_ASSOC];
+
+  //L2 Cache properties
+  parameter L2_CACHESIZE = 16384;
+  parameter L2_ASSOC = 4;
+  parameter L2_NUMSETS = L2_CACHESIZE/(BLOCKSIZE * L2_ASSOC);
+  reg[31:0] L2_index;         
+  reg[31:0] L2_tag;
+  reg[31:0] L2_cache [0:L2_NUMSETS][0:L2_ASSOC];
+
   // FSM Regs and Parameters
   parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFTFULL = 3, SHIFTEMPTY = 4, LRUHIT = 5, DONE = 6;
   reg[3:0] state, next_state;
@@ -65,30 +74,40 @@ module cache_top(
     case(state)
         
         // Idle state for cache, keep cache state value the same
-        IDLE:begin
-            next_state <= (cache_addr != prev_addr) ? READ:IDLE;
-        end
+        IDLE: next_state <= (cache_addr != prev_addr) ? READ:IDLE;
         
         // Read in address to find tag, index, and block off-set
-        READ:begin
-            tag <= cache_addr / BLOCKSIZE;               // Current Tag address derived from the input cache address
-            index <= (cache_addr / BLOCKSIZE) % NUMSETS; // Current Set that the tag will go into
-            curr_tag <= tag;
-            curr_set <= index;
-            next_state <= SEARCH;
-        end
+        READ: next_state <= SEARCH;
         
         // Search for tag state
         SEARCH:begin 
             
-            // FIFO
-            if(replace_policy == 0)begin
-                next_state <= (cache[index][ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+            // L1 Cache search
+            if(cache_lvl)begin 
+                
+                // FIFO
+                if(replace_policy == 0)begin
+                    next_state <= (L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+                end
+
+                // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
+                else
+                    next_state <= (found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
             end
 
-            // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
-            else
-                next_state <= (found) ? LRUHIT:(cache[index][ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+            // L2 Cache search
+            else begin
+
+                // FIFO
+                if(replace_policy == 0)begin
+                    next_state <= (L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+                end
+
+                // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
+                else
+                    next_state <= (found) ? LRUHIT:(L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+            end
+            
         end
         
         // Shift if current cache is Full FIFO or Full LRU Miss
@@ -120,9 +139,17 @@ module cache_top(
         found <= 1'b0;
         prev_addr <= 48'b0;
 
-        for(i = 0; i < NUMSETS; i = i + 1)begin
-            for(j = 0; j < ASSOC; j = j + 1)begin
-                cache[i][j] = 32'b0;
+        // Clear for L1
+        for(i = 0; i < L1_NUMSETS; i = i + 1)begin
+            for(j = 0; j < L1_ASSOC; j = j + 1)begin
+                L1_cache[i][j] = 32'b0;
+            end
+        end
+
+        // Clear for L2
+        for(i = 0; i < L2_NUMSETS; i = i + 1)begin
+            for(j = 0; j < L2_ASSOC; j = j + 1)begin
+                L2_cache[i][j] = 32'b0;
             end
         end
     end
@@ -133,6 +160,23 @@ module cache_top(
         
         // If an address has been read, increment reads, get tag & index for FSM
         if(next_state == READ)begin
+            
+            // L1 Cache input
+            if(cache_lvl)begin
+                L1_tag <= cache_addr / BLOCKSIZE;                   // Current Tag address derived from the input cache address
+                L1_index <= (cache_addr / BLOCKSIZE) % L1_NUMSETS;  // Current Set that the tag will go into
+                curr_tag <= L1_tag;
+                curr_set <= L1_index;
+            end
+
+            // L2 Cache input
+            else begin
+                L2_tag <= cache_addr / BLOCKSIZE;                   // Current Tag address derived from the input cache address
+                L2_index <= (cache_addr / BLOCKSIZE) % L2_NUMSETS;  // Current Set that the tag will go into
+                curr_tag <= L2_tag;
+                curr_set <= L2_index;
+            end
+            
             // If write through & W operation increment writes
             if(write_policy == 0 && cache_op == 8'h57)begin
                 num_writes = num_writes + 1;
@@ -145,12 +189,22 @@ module cache_top(
                 // FIFO 
                 if(replace_policy == 0)begin
                 
-                // If tag is in cache, mark as found
-                for(i = 0; i < ASSOC; i = i + 1)begin
-                        
-                    if(tag == cache[index][i])begin
-                        found <= 1'b1;
-                    end
+                // If tag is in L1 cache, mark as found
+                if(cache_lvl)begin
+                    for(i = 0; i < L1_ASSOC; i = i + 1)begin
+                        if(L1_tag == L1_cache[L1_index][i])begin
+                            found <= 1'b1;
+                        end
+                    end  
+                end
+
+                // If tag is in L2 cache, mark as found
+                else begin
+                    for(i = 0; i < L2_ASSOC; i = i + 1)begin
+                        if(L2_tag == L2_cache[L2_index][i])begin
+                            found <= 1'b1;
+                        end
+                    end  
                 end
 
                 // If found, increment hits, and reset found flag
@@ -174,14 +228,26 @@ module cache_top(
             // LRU
             else begin
                 
-                // If tag found in cache, mark as found and mark LRU tag index
-                for(i = 0; i < ASSOC; i = i + 1)begin        
-                if(tag == cache[index][i])begin
-                        found <= 1'b1;
-                        lru_index <= i;
-                    end
+                // L1 Cache | If tag found in cache, mark as found and mark LRU tag index
+                if(cache_lvl)begin
+                    for(i = 0; i < L1_ASSOC; i = i + 1)begin        
+                        if(L1_tag == L1_cache[L1_index][i])begin
+                                found <= 1'b1;
+                                lru_index <= i;
+                        end
+                    end               
                 end
 
+                // L2 Cache | If tag found in cache, mark as found and mark LRU tag index
+                else begin
+                    for(i = 0; i < L2_ASSOC; i = i + 1)begin        
+                        if(L2_tag == L2_cache[L2_index][i])begin
+                                found <= 1'b1;
+                                lru_index <= i;
+                        end
+                    end               
+                end
+            
                 // If found, increment hits and clear found flag
                 if(found)begin
                     num_hits = num_hits + 1;
@@ -204,45 +270,95 @@ module cache_top(
         
         // Shift logic if the cache for LRU or FIFO is full
         else if(next_state == SHIFTFULL)begin
-        
-                // Pop out last address out of cache before shifting
-                cache[index][ASSOC-1] <= 32'b0;
-                    
-                // Shifts through the current set with the size of the cache line to shift in FIFO order
-                for(i = ASSOC; i > 0; i = i - 1)begin
-                    cache[index][i] <= cache[index][i-1];
+
+                if(cache_lvl)begin
+
+                    // Pop out last address out of cache before shifting
+                    L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
+                        
+                    // Shifts through the current set with the size of the cache line to shift in FIFO order
+                    for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                        L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
+                    end
+                        
+                    // Insert new address at beginning of cache line
+                    L1_cache[L1_index][0] <= L1_tag;
                 end
-                    
-                // Insert new address at beginning of cache line
-                cache[index][0] <= tag;
+
+                else begin
+
+                    // Pop out last address out of cache before shifting
+                    L2_cache[L2_index][L2_ASSOC-1] <= 32'b0;
+                        
+                    // Shifts through the current set with the size of the cache line to shift in FIFO order
+                    for(i = L2_ASSOC; i > 0; i = i - 1)begin
+                        L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                    end
+                        
+                    // Insert new address at beginning of cache line
+                    L2_cache[L2_index][0] <= L2_tag;
+                end
+                
         
         end
         
         // Shift logic if the cache for LRU or FIFO isn't full
         else if(next_state == SHIFTEMPTY)begin
 
-                // Shifts through the current set with the size of the cache line to shift in FIFO order
-                for(i = ASSOC; i > 0; i = i - 1)begin
-                    cache[index][i] <= cache[index][i-1];
+                // L1 Cache
+                if(cache_lvl)begin
+                    // Shifts through the current set with the size of the cache line to shift in FIFO order
+                    for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                        L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
+                    end
+                        
+                    // Insert new address at beginning of cache line
+                    L1_cache[L1_index][0] <= L1_tag;
                 end
-                    
-                // Insert new address at beginning of cache line
-                cache[index][0] <= tag;
+
+                // L2 Cache
+                else begin
+                    // Shifts through the current set with the size of the cache line to shift in FIFO order
+                    for(i = L2_ASSOC; i > 0; i = i - 1)begin
+                        L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                    end
+                        
+                    // Insert new address at beginning of cache line
+                    L2_cache[L2_index][0] <= L2_tag;
+                end
         end
 
         // Shift logic for LRU hit
         else if(next_state == LRUHIT)begin
 
-                // Pop out LRU hit tag out of cache before shifting
-                cache[index][lru_index] <= 32'b0;
-                    
-                // Shifts through the current set with the size of the cache line to shift in LRU order
-                for(i = lru_index; i > 0; i = i - 1)begin
-                    cache[index][i] <= cache[index][i-1];
+                // L1 cache
+                if(cache_lvl)begin
+                    // Pop out LRU hit tag out of cache before shifting
+                    L1_cache[L1_index][lru_index] <= 32'b0;
+                        
+                    // Shifts through the current set with the size of the cache line to shift in LRU order
+                    for(i = lru_index; i > 0; i = i - 1)begin
+                        L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
+                    end
+                        
+                    // Insert new address at beginning of cache line
+                    L1_cache[L1_index][0] <= L1_tag;     
                 end
-                    
-                // Insert new address at beginning of cache line
-                cache[index][0] <= tag;
+
+                // L2 cache
+                else begin
+
+                    // Pop out LRU hit tag out of cache before shifting
+                    L2_cache[L2_index][lru_index] <= 32'b0;
+                        
+                    // Shifts through the current set with the size of the cache line to shift in LRU order
+                    for(i = lru_index; i > 0; i = i - 1)begin
+                        L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                    end
+                        
+                    // Insert new address at beginning of cache line
+                    L2_cache[L2_index][0] <= L2_tag;     
+                end
         end
         
         // Finish LRU or FIFO address insertion and calculate cache miss rate
