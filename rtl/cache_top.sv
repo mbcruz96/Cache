@@ -44,8 +44,8 @@ module cache_top(
   parameter BLOCKSIZE = 64;
 
   //L1 Cache properties
-  parameter L1_CACHESIZE = 8192;
-  parameter L1_ASSOC = 2;
+  parameter L1_CACHESIZE = 32768;
+  parameter L1_ASSOC = 8;
   parameter L1_NUMSETS = L1_CACHESIZE/(BLOCKSIZE * L1_ASSOC);
   reg[31:0] L1_index;         
   reg[31:0] L1_tag;
@@ -135,6 +135,8 @@ module cache_top(
         num_hits <= 8'b0;
         num_reads <= 8'b0;
         num_writes <= 8'b0;
+        curr_set <= 12'b0;
+        curr_tag <= 32'b0;
         cache_miss_rate <= 12'b0;
         found <= 1'b0;
         prev_addr <= 48'b0;
@@ -194,6 +196,7 @@ module cache_top(
                     for(i = 0; i < L1_ASSOC; i = i + 1)begin
                         if(L1_tag == L1_cache[L1_index][i])begin
                             found <= 1'b1;
+                            break;
                         end
                     end  
                 end
@@ -203,13 +206,14 @@ module cache_top(
                     for(i = 0; i < L2_ASSOC; i = i + 1)begin
                         if(L2_tag == L2_cache[L2_index][i])begin
                             found <= 1'b1;
+                            break;
                         end
                     end  
                 end
 
                 // If found, increment hits, and reset found flag
                 if(found)begin
-                    num_hits = num_hits + 1;
+                    //num_hits = num_hits + 1;
                     found <= 1'b0;
                 end
 
@@ -234,6 +238,7 @@ module cache_top(
                         if(L1_tag == L1_cache[L1_index][i])begin
                                 found <= 1'b1;
                                 lru_index <= i;
+                                break;
                         end
                     end               
                 end
@@ -244,6 +249,7 @@ module cache_top(
                         if(L2_tag == L2_cache[L2_index][i])begin
                                 found <= 1'b1;
                                 lru_index <= i;
+                                break;
                         end
                     end               
                 end

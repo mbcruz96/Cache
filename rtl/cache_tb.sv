@@ -80,12 +80,12 @@ module cache_tb();
         48'h7f3035541a18,
         48'h7f3035544ff4,
         48'h7f3035541a10,
-        48'h7f3035541a10,
+        48'h7f3035541a12,
         48'h7f3035540488,
-        48'h7f3035540488,
+        48'h7f3035540487,
         48'h7f3035541a18,
         48'h7f3035541a14,
-        48'h7f3035541a14,
+        48'h7f3035541a13,
         48'h7f30355404c0,
         48'h7f30355404d8,
         48'h7f303553e6b8,
@@ -122,11 +122,11 @@ module cache_tb();
         48'h7f3035540400,
         48'h7f3035540488,
         48'h7f3035541a14,
-        48'h7f3035541a14,
+        48'h7f3035541a13,
         48'h7f3035541a18,
         48'h7f3035544ff4,
         48'h7f3035541a10,
-        48'h7f3035541a10,
+        48'h7f3035541a12,
         48'h7fff49382228,
         48'h7fff49382230,
         48'h7fff49382238,
@@ -266,9 +266,9 @@ module cache_tb();
         );
     integer i;
     initial begin
-        replace_policy = 0;
-        write_policy = 0;
-        cache_lvl = 0;
+        replace_policy = 1;
+        write_policy = 1;
+        cache_lvl = 1;
         clk = 1;
         reset = 1;
         #10
@@ -278,7 +278,6 @@ module cache_tb();
             cache_addr = test_addrs[i];
             cache_op = test_ops[i];
             #10;
-
         end
         misses = num_misses;
         reads = num_reads;
