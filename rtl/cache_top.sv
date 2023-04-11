@@ -237,7 +237,7 @@ module cache_top(
                     for(i = 0; i < L1_ASSOC; i = i + 1)begin        
                         if(L1_tag == L1_cache[L1_index][i])begin
                                 found <= 1'b1;
-                                lru_index <= i;
+                                lru_index = i;
                                 break;
                         end
                     end               
@@ -248,7 +248,7 @@ module cache_top(
                     for(i = 0; i < L2_ASSOC; i = i + 1)begin        
                         if(L2_tag == L2_cache[L2_index][i])begin
                                 found <= 1'b1;
-                                lru_index <= i;
+                                lru_index = i;
                                 break;
                         end
                     end               
@@ -343,8 +343,10 @@ module cache_top(
                     L1_cache[L1_index][lru_index] <= 32'b0;
                         
                     // Shifts through the current set with the size of the cache line to shift in LRU order
-                    for(i = lru_index; i > 0; i = i - 1)begin
-                        L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
+                    for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                    
+                        if(i <= lru_index)
+                            L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                     end
                         
                     // Insert new address at beginning of cache line
@@ -358,8 +360,10 @@ module cache_top(
                     L2_cache[L2_index][lru_index] <= 32'b0;
                         
                     // Shifts through the current set with the size of the cache line to shift in LRU order
-                    for(i = lru_index; i > 0; i = i - 1)begin
-                        L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                    for(i = L2_ASSOC; i > 0; i = i - 1)begin
+                        
+                        if(i <= lru_index)
+                            L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
                     end
                         
                     // Insert new address at beginning of cache line
