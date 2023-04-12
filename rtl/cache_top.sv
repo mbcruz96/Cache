@@ -231,17 +231,14 @@ module cache_top(
                 else if(!L1_found && L2_found)begin
                 
                      // Miss in L1
-                    if(!L1_found)begin
-                        L1_misses <= L1_misses + 1;
+                    L1_misses <= L1_misses + 1;
                         
-                        if(write_policy == 1 && cache_op == 7'h57)begin
-                            L1_writes <= L1_writes + 1;
-                        end
+                    if(write_policy == 1 && cache_op == 7'h57)begin
+                        L1_writes <= L1_writes + 1;
                     end
-                    
+
                     // Hit in L2
-                    else if(L2_found)
-                        L2_hits <= L2_hits + 1;
+                    L2_hits <= L2_hits + 1;
                         
                     L1_found <= 1'b0;
                     L2_found <= 1'b0;
@@ -314,17 +311,14 @@ module cache_top(
                 else if(!L1_found && L2_found)begin
                 
                      // Miss in L1
-                    if(!L1_found)begin
-                        L1_misses <= L1_misses + 1;
+                    L1_misses <= L1_misses + 1;
                         
-                        if(write_policy == 1 && cache_op == 7'h57)begin
-                            L1_writes <= L1_writes + 1;
-                        end
+                    if(write_policy == 1 && cache_op == 7'h57)begin
+                        L1_writes <= L1_writes + 1;
                     end
-                    
+
                     // Hit in L2
-                    else if(L2_found)
-                        L2_hits <= L2_hits + 1;
+                    L2_hits <= L2_hits + 1;
                         
                     L1_found <= 1'b0;
                     L2_found <= 1'b0;

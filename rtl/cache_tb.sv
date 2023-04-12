@@ -267,10 +267,23 @@ module cache_tb();
         .cache_lvl(cache_lvl)
         );
     integer i;
+    
+    /*                                   SIMULATION INPUTS
+    ************************************************************************************************
+        replace_policy: 0 -> FIFO | 1 -> LRU
+        
+        write_policy: 0 -> write-through | 1 -> write-back
+        
+        inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive
+        
+        cache_lvl: 0 -> L2 | 1 -> L1
+    ************************************************************************************************   
+    */
     initial begin
         replace_policy = 0;
         write_policy = 0;
         cache_lvl = 1;
+        inclusion_policy = 0;
         clk = 1;
         reset = 1;
         #10
