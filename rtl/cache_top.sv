@@ -1,12 +1,12 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Company: UCF
+// Engineers: John Gierlach & Harrison Lipton
 // 
 // Create Date: 03/16/2023 12:43:31 AM
 // Design Name: 
 // Module Name: cache_top
-// Project Name: 
+// Project Name: Multi-level Cache project
 // Target Devices: 
 // Tool Versions: 
 // Description: 
@@ -29,9 +29,8 @@ module cache_top(
   input[47:0] cache_addr,
   input[7:0] cache_op,
   input cache_lvl,
-  output reg[11:0] cache_miss_rate,
-  output reg[11:0] num_reads, num_misses, num_hits,
-  output reg[11:0] num_writes,
+  output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
+  output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes,
   output reg[31:0] curr_tag,
   output reg[11:0] curr_set
 );
@@ -44,7 +43,7 @@ module cache_top(
   parameter BLOCKSIZE = 64;
 
   //L1 Cache properties
-  parameter L1_CACHESIZE = 32768;
+  parameter L1_CACHESIZE = 2048;
   parameter L1_ASSOC = 8;
   parameter L1_NUMSETS = L1_CACHESIZE/(BLOCKSIZE * L1_ASSOC);
   reg[31:0] L1_index;         
@@ -65,8 +64,8 @@ module cache_top(
   reg[47:0] prev_addr;
   
   // Counter variables
-  reg      found;
-  integer i, j, lru_index;
+  reg      L1_found, L2_found;
+  integer i, j, L1_lru_index, L2_lru_index;
   
   // Replacement policy FSM | Combinational logic
   always@(*)begin
@@ -92,7 +91,7 @@ module cache_top(
 
                 // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
                 else
-                    next_state <= (found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+                    next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
             end
 
             // L2 Cache search
@@ -105,7 +104,7 @@ module cache_top(
 
                 // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
                 else
-                    next_state <= (found) ? LRUHIT:(L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+                    next_state <= (L1_found | L2_found) ? LRUHIT:(L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
             end
             
         end
@@ -131,14 +130,18 @@ module cache_top(
     // Initialize values for testing
     if(reset)begin
         state <= IDLE;
-        num_misses <= 8'b0;
-        num_hits <= 8'b0;
-        num_reads <= 8'b0;
-        num_writes <= 8'b0;
+        L1_misses <= 12'b0;
+        L1_hits <= 12'b0;
+        L1_reads <= 12'b0;
+        L1_writes <= 12'b0;
+        L2_misses <= 12'b0;
+        L2_hits <= 12'b0;
+        L2_reads <= 12'b0;
+        L2_writes <= 12'b0;
         curr_set <= 12'b0;
         curr_tag <= 32'b0;
-        cache_miss_rate <= 12'b0;
-        found <= 1'b0;
+        L1_found <= 1'b0;
+        L2_found <= 1'b0;
         prev_addr <= 48'b0;
 
         // Clear for L1
@@ -181,51 +184,98 @@ module cache_top(
             
             // If write through & W operation increment writes
             if(write_policy == 0 && cache_op == 8'h57)begin
-                num_writes = num_writes + 1;
+                
+                // L1 Writes
+                if(cache_lvl)
+                    L1_writes <= L1_writes + 1;
+                    
+                // L2 Writes
+                else
+                    L2_writes <= L2_writes + 1;
             end
         end
         
         // Search for the tag within the current replacement policy, write policy, and inclusion policy
         else if(next_state == SEARCH)begin
 
-                // FIFO 
-                if(replace_policy == 0)begin
+            // FIFO 
+            if(replace_policy == 0)begin
                 
-                // If tag is in L1 cache, mark as found
-                if(cache_lvl)begin
-                    for(i = 0; i < L1_ASSOC; i = i + 1)begin
-                        if(L1_tag == L1_cache[L1_index][i])begin
-                            found <= 1'b1;
-                            break;
-                        end
-                    end  
-                end
-
-                // If tag is in L2 cache, mark as found
-                else begin
-                    for(i = 0; i < L2_ASSOC; i = i + 1)begin
-                        if(L2_tag == L2_cache[L2_index][i])begin
-                            found <= 1'b1;
-                            break;
-                        end
-                    end  
-                end
-
-                // If found, increment hits, and reset found flag
-                if(found)begin
-                    //num_hits = num_hits + 1;
-                    found <= 1'b0;
-                end
-
-                // If tag is not found, increment misses and reads
-                else begin
-                    num_misses <= num_misses + 1;
-                    num_reads = num_reads + 1;
-                    
-                    // If write back & W operation increment writes
-                    if(write_policy == 1 && cache_op == 7'h57)begin
-                        num_writes = num_writes + 1;
+                // If tag is in L1 or L2 cache, mark as found in respective cache
+                for(i = 0; i < L1_ASSOC; i = i + 1)begin
+                    if(curr_tag == L1_cache[L1_index][i])begin
+                        L1_found <= 1'b1;
+                        break;
                     end
+                end  
+                
+                
+                for(i = 0; i < L2_ASSOC; i = i + 1)begin
+                    if(curr_tag == L2_cache[L2_index][i])begin
+                        L2_found <= 1'b1;
+                        break;
+                    end
+                end  
+
+                // If found in both caches, increment hits, and reset found flag
+                if(L1_found && L2_found)begin
+                    
+                    L1_hits <= L1_hits + 1;                   
+                    L2_hits <= L2_hits + 1;
+                        
+                    L1_found <= 1'b0;
+                    L2_found <= 1'b0;
+                end
+                
+                // If Hit on L2 & not on L1
+                else if(!L1_found && L2_found)begin
+                
+                     // Miss in L1
+                    if(!L1_found)begin
+                        L1_misses <= L1_misses + 1;
+                        
+                        if(write_policy == 1 && cache_op == 7'h57)begin
+                            L1_writes <= L1_writes + 1;
+                        end
+                    end
+                    
+                    // Hit in L2
+                    else if(L2_found)
+                        L2_hits <= L2_hits + 1;
+                        
+                    L1_found <= 1'b0;
+                    L2_found <= 1'b0;
+                end
+                
+                // If Hit on L1 & not on L2
+                else if(L1_found && !L2_found)begin
+                
+                    // Miss in L2
+                    L2_misses <= L2_misses + 1;
+                    if(write_policy == 1 && cache_op == 7'h57)
+                        L2_writes <= L2_writes + 1;
+
+                    // Hit in L1
+                    L1_hits <= L1_hits + 1;
+                    
+                    L1_found <= 1'b0;
+                    L2_found <= 1'b0;
+                end
+                
+                // If tag is not found in either cache, increment misses and reads for each cache
+                else begin
+                    
+                    L1_misses = L1_misses + 1;
+                    L2_misses = L2_misses + 1;
+                    L1_reads = L1_reads + 1;
+                    L2_reads = L1_reads + 1;
+                    
+                    // If write back & W operation increment writes for L2 and L1 cache
+                    if(write_policy == 1 && cache_op == 7'h57)begin                        
+                        L1_writes <= L1_writes + 1;
+                        L2_writes <= L2_writes + 1;
+                    end
+                    
                 end
             end
             
@@ -233,45 +283,84 @@ module cache_top(
             else begin
                 
                 // L1 Cache | If tag found in cache, mark as found and mark LRU tag index
-                if(cache_lvl)begin
-                    for(i = 0; i < L1_ASSOC; i = i + 1)begin        
-                        if(L1_tag == L1_cache[L1_index][i])begin
-                                found <= 1'b1;
-                                lru_index = i;
-                                break;
-                        end
-                    end               
-                end
+                for(i = 0; i < L1_ASSOC; i = i + 1)begin        
+                    if(curr_tag == L1_cache[L1_index][i])begin
+                            L1_found <= 1'b1;
+                            L1_lru_index = i;
+                            break;
+                    end
+                end               
 
                 // L2 Cache | If tag found in cache, mark as found and mark LRU tag index
-                else begin
-                    for(i = 0; i < L2_ASSOC; i = i + 1)begin        
-                        if(L2_tag == L2_cache[L2_index][i])begin
-                                found <= 1'b1;
-                                lru_index = i;
-                                break;
-                        end
-                    end               
-                end
-            
-                // If found, increment hits and clear found flag
-                if(found)begin
-                    num_hits = num_hits + 1;
-                    found <= 1'b0;
-                end
-
-                // If not found, increment misses and reads
-                else begin
-                    num_misses = num_misses + 1;
-                    num_reads = num_reads + 1;
-                    
-                    // If write back & W operation increment writes
-                    if(write_policy == 1 && cache_op == 8'h57)begin
-                        num_writes = num_writes + 1;
+                for(i = 0; i < L2_ASSOC; i = i + 1)begin        
+                    if(curr_tag == L2_cache[L2_index][i])begin
+                            L2_found <= 1'b1;
+                            L2_lru_index = i;
+                            break;
                     end
+                end               
+            
+               // If found, increment hits, and reset found flag
+                if(L1_found && L2_found)begin
+                    
+                    L1_hits <= L1_hits + 1;                   
+                    L2_hits <= L2_hits + 1;
+                        
+                    L1_found <= 1'b0;
+                    L2_found <= 1'b0;
                 end
-            end
-                       
+                
+                // If Hit on L2 & not on L1
+                else if(!L1_found && L2_found)begin
+                
+                     // Miss in L1
+                    if(!L1_found)begin
+                        L1_misses <= L1_misses + 1;
+                        
+                        if(write_policy == 1 && cache_op == 7'h57)begin
+                            L1_writes <= L1_writes + 1;
+                        end
+                    end
+                    
+                    // Hit in L2
+                    else if(L2_found)
+                        L2_hits <= L2_hits + 1;
+                        
+                    L1_found <= 1'b0;
+                    L2_found <= 1'b0;
+                end
+                
+                // If Hit on L1 & not on L2
+                else if(L1_found && !L2_found)begin
+                
+                    // Miss in L2
+                    L2_misses <= L2_misses + 1;
+                    if(write_policy == 1 && cache_op == 7'h57)
+                        L2_writes <= L2_writes + 1;
+
+                    // Hit in L1
+                    L1_hits <= L1_hits + 1;
+                    
+                    L1_found <= 1'b0;
+                    L2_found <= 1'b0;
+                end
+                
+                // If tag is not found in either cache, increment misses and reads for each cache
+                else begin
+                    
+                    L1_misses = L1_misses + 1;
+                    L2_misses = L2_misses + 1;
+                    L1_reads = L1_reads + 1;
+                    L2_reads = L1_reads + 1;
+                    
+                    // If write back & W operation increment writes for L2 and L1 cache
+                    if(write_policy == 1 && cache_op == 7'h57)begin                        
+                        L1_writes <= L1_writes + 1;
+                        L2_writes <= L2_writes + 1;
+                    end
+                    
+                end
+            end                    
         end
         
         // Shift logic if the cache for LRU or FIFO is full
@@ -304,8 +393,6 @@ module cache_top(
                     // Insert new address at beginning of cache line
                     L2_cache[L2_index][0] <= L2_tag;
                 end
-                
-        
         end
         
         // Shift logic if the cache for LRU or FIFO isn't full
@@ -340,12 +427,12 @@ module cache_top(
                 // L1 cache
                 if(cache_lvl)begin
                     // Pop out LRU hit tag out of cache before shifting
-                    L1_cache[L1_index][lru_index] <= 32'b0;
+                    L1_cache[L1_index][L1_lru_index] <= 32'b0;
                         
                     // Shifts through the current set with the size of the cache line to shift in LRU order
                     for(i = L1_ASSOC; i > 0; i = i - 1)begin
                     
-                        if(i <= lru_index)
+                        if(i <= L1_lru_index)
                             L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                     end
                         
@@ -357,12 +444,12 @@ module cache_top(
                 else begin
 
                     // Pop out LRU hit tag out of cache before shifting
-                    L2_cache[L2_index][lru_index] <= 32'b0;
+                    L2_cache[L2_index][L2_lru_index] <= 32'b0;
                         
                     // Shifts through the current set with the size of the cache line to shift in LRU order
                     for(i = L2_ASSOC; i > 0; i = i - 1)begin
                         
-                        if(i <= lru_index)
+                        if(i <= L2_lru_index)
                             L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
                     end
                         
@@ -374,7 +461,6 @@ module cache_top(
         // Finish LRU or FIFO address insertion and calculate cache miss rate
         else if(next_state == DONE)begin
             prev_addr <= cache_addr;
-            cache_miss_rate <= num_misses / (num_reads);
         end
     end
   end   

@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+//`include "test_inputs.vh"
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
@@ -27,13 +28,12 @@ module cache_tb();
     reg[47:0] cache_addr;
     reg[7:0] cache_op;
     reg cache_lvl;
-    wire[11:0] num_reads, num_writes, num_misses, num_hits;
+    wire[11:0] L1_reads, L1_writes, L1_misses, L1_hits;
+    wire[11:0] L2_reads, L2_writes, L2_misses, L2_hits;
     wire[31:0] curr_tag;
     reg[11:0] curr_set;
     parameter SIZE = 100;
-    
-    // Test Addresses
-    reg[47:0] test_addrs[0:SIZE-1] = 
+    reg [47:0] test_addrs[0:SIZE-1] = 
     {   48'h7fff493822b8,
         48'h0000006324d8,
         48'h7fff493822b0,
@@ -135,11 +135,8 @@ module cache_tb();
         48'h000000634600,
         48'h7f3035f6a7c0
     };
-    
-    // Test operations
-    // 8'h57 = W
-    // 8'h52 = R
-    reg[7:0] test_ops[0:SIZE-1] =
+
+    reg [7:0] test_ops[0:SIZE-1] =
     {   8'h57,
         8'h52,
         8'h57,
@@ -241,13 +238,14 @@ module cache_tb();
         8'h52,
         8'h52
     };
-
+    
     // TODO: Add test which level will be accessed
     //reg test_cache_lvl[0:SIZE-1]={
     //};
     
-    real miss_rate;
-    real misses, reads, hits, writes;
+    real L1_miss_rate, L2_miss_rate;
+    real L1misses, L1reads, L1hits, L1writes;
+    real L2misses, L2reads, L2hits, L2writes;
     cache_top UUT(
         .clk(clk), 
         .reset(reset), 
@@ -255,10 +253,14 @@ module cache_tb();
         .replace_policy(replace_policy),
         .inclusion_policy(inclusion_policy),
         .cache_addr(cache_addr),
-        .num_reads(num_reads),
-        .num_writes(num_writes),
-        .num_misses(num_misses),
-        .num_hits(num_hits),
+        .L1_reads(L1_reads),
+        .L1_writes(L1_writes),
+        .L1_misses(L1_misses),
+        .L1_hits(L1_hits),
+        .L2_reads(L2_reads),
+        .L2_writes(L2_writes),
+        .L2_misses(L2_misses),
+        .L2_hits(L2_hits),
         .curr_tag(curr_tag),
         .cache_op(cache_op),
         .curr_set(curr_set),
@@ -266,8 +268,8 @@ module cache_tb();
         );
     integer i;
     initial begin
-        replace_policy = 1;
-        write_policy = 1;
+        replace_policy = 0;
+        write_policy = 0;
         cache_lvl = 1;
         clk = 1;
         reset = 1;
@@ -279,11 +281,20 @@ module cache_tb();
             cache_op = test_ops[i];
             #10;
         end
-        misses = num_misses;
-        reads = num_reads;
-        hits = num_hits;
-        writes = num_writes;
-        miss_rate = misses / (hits+misses);
+        
+        // L1 stats
+        L1misses = L1_misses;
+        L1reads = L1_reads;
+        L1hits = L1_hits;
+        L1writes = L1_writes;
+        L1_miss_rate = L1misses / (L1hits+L1misses);
+        
+        //L2 stats
+        L2misses = L2_misses;
+        L2reads = L2_reads;
+        L2hits = L2_hits;
+        L2writes = L2_writes;
+        L2_miss_rate = L2misses / (L2hits+L2misses);
     end
     
     always #1 clk = ~clk;
