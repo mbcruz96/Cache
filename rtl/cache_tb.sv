@@ -1,13 +1,12 @@
 `timescale 1ns / 1ps
-//`include "test_inputs.vh"
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Company: UCF
+// Engineers: John Gierlach & Harrison Lipton
 // 
-// Create Date: 04/05/2023 03:57:04 PM
+// Create Date: 03/16/2023 12:43:31 AM
 // Design Name: 
-// Module Name: cache_tb
-// Project Name: 
+// Module Name: cache_top
+// Project Name: Multi-level Cache project
 // Target Devices: 
 // Tool Versions: 
 // Description: 
@@ -20,7 +19,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
 module cache_tb();
     reg clk, reset;
     reg write_policy, replace_policy;
@@ -31,6 +29,7 @@ module cache_tb();
     wire[11:0] L1_reads, L1_writes, L1_misses, L1_hits;
     wire[11:0] L2_reads, L2_writes, L2_misses, L2_hits;
     wire[31:0] curr_tag;
+    wire[31:0] Test [0:L1_NUMSETS-1][0:L1_ASSOC-1];
     reg[11:0] curr_set;
     parameter SIZE = 100;
     reg [47:0] test_addrs[0:SIZE-1] = 
@@ -141,24 +140,13 @@ module cache_tb();
         8'h52,
         8'h57,
         8'h57,
-        8'h52,
-        8'h52,
-        8'h52,
-        8'h52,
         8'h57,
         8'h57,
         8'h57,
-        8'h52,
-        8'h52,
+        8'h57,
         8'h57,
         8'h52,
         8'h57,
-        8'h52,
-        8'h57,
-        8'h52,
-        8'h52,
-        8'h57,
-        8'h52,
         8'h57,
         8'h57,
         8'h52,
@@ -166,7 +154,18 @@ module cache_tb();
         8'h52,
         8'h52,
         8'h57,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h52,
         8'h57,
+        8'h52,
+        8'h52,
+        8'h52,
+        8'h52,
         8'h57,
         8'h52,
         8'h52,
@@ -264,7 +263,8 @@ module cache_tb();
         .curr_tag(curr_tag),
         .cache_op(cache_op),
         .curr_set(curr_set),
-        .cache_lvl(cache_lvl)
+        .cache_lvl(cache_lvl),
+        .L1_cache(Test)
         );
     integer i;
     
@@ -280,15 +280,15 @@ module cache_tb();
     ************************************************************************************************   
     */
     initial begin
-        replace_policy = 0;
-        write_policy = 0;
+        replace_policy = 1;
+        write_policy = 1;
         cache_lvl = 1;
         inclusion_policy = 0;
         clk = 1;
         reset = 1;
         #10
         reset = 0;
-                //send an addr and op from array to top module
+        //send an addr and op from array to top module
         for(i = 0; i < SIZE; i=i+1)begin
             cache_addr = test_addrs[i];
             cache_op = test_ops[i];
