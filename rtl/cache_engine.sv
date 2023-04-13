@@ -78,7 +78,7 @@ module cache_engine(
                 
                 // FIFO
                 if(replace_policy == 0)begin
-                    next_state <= (L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+                    next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
                 end
 
                 // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
@@ -91,7 +91,7 @@ module cache_engine(
 
                 // FIFO
                 if(replace_policy == 0)begin
-                    next_state <= (L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+                    next_state <= (L1_found | L2_found) ? LRUHIT:(L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
                 end
 
                 // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
@@ -407,37 +407,40 @@ module cache_engine(
         // Shift logic for LRU hit
         else if(next_state == LRUHIT)begin
 
-                // L1 cache
-                if(cache_lvl)begin
-                    // Pop out LRU hit tag out of cache before shifting
-                    L1_cache[L1_index][L1_lru_index] <= 32'b0;
-                        
-                    // Shifts through the current set with the size of the cache line to shift in LRU order
-                    for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                if(replace_policy == 1)begin
                     
-                        if(i <= L1_lru_index)
-                            L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
+                    // L1 cache
+                    if(cache_lvl)begin
+                        // Pop out LRU hit tag out of cache before shifting
+                        L1_cache[L1_index][L1_lru_index] <= 32'b0;
+                            
+                        // Shifts through the current set with the size of the cache line to shift in LRU order
+                        for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                        
+                            if(i <= L1_lru_index)
+                                L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
+                        end
+                            
+                        // Insert new address at beginning of cache line
+                        L1_cache[L1_index][0] <= L1_tag;     
                     end
-                        
-                    // Insert new address at beginning of cache line
-                    L1_cache[L1_index][0] <= L1_tag;     
-                end
-
-                // L2 cache
-                else begin
-
-                    // Pop out LRU hit tag out of cache before shifting
-                    L2_cache[L2_index][L2_lru_index] <= 32'b0;
-                        
-                    // Shifts through the current set with the size of the cache line to shift in LRU order
-                    for(i = L2_ASSOC; i > 0; i = i - 1)begin
-                        
-                        if(i <= L2_lru_index)
-                            L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+    
+                    // L2 cache
+                    else begin
+    
+                        // Pop out LRU hit tag out of cache before shifting
+                        L2_cache[L2_index][L2_lru_index] <= 32'b0;
+                            
+                        // Shifts through the current set with the size of the cache line to shift in LRU order
+                        for(i = L2_ASSOC; i > 0; i = i - 1)begin
+                            
+                            if(i <= L2_lru_index)
+                                L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                        end
+                            
+                        // Insert new address at beginning of cache line
+                        L2_cache[L2_index][0] <= L2_tag;     
                     end
-                        
-                    // Insert new address at beginning of cache line
-                    L2_cache[L2_index][0] <= L2_tag;     
                 end
                 L1_found <= 1'b0;
                 L2_found <= 1'b0;
