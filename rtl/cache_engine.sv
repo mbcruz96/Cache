@@ -193,73 +193,23 @@ module cache_engine(
             // FIFO 
             if(replace_policy == 0)begin
                 
-                // If tag is in L1 or L2 cache, mark as found in respective cache
-                for(i = 0; i < L1_ASSOC; i = i + 1)begin
-                    if(L1_tag == L1_cache[L1_index][i])begin
-                        L1_found <= 1'b1;
-                        break;
+                // L1 Cache | If tag found in cache, mark as found and mark LRU tag index
+                for(i = 0; i < L1_ASSOC; i = i + 1)begin        
+                    if(curr_tag == L1_cache[L1_index][i])begin
+                            L1_found <= 1'b1;
+                            L1_hits <= L1_hits + 1;
+                            break;
                     end
-                end  
-                
-                
-                for(i = 0; i < L2_ASSOC; i = i + 1)begin
-                    if(L2_tag == L2_cache[L2_index][i])begin
-                        L2_found <= 1'b1;
-                        break;
-                    end
-                end  
+                end               
 
-                // If found in both caches, increment hits, and reset found flag
-                if(L1_found && L2_found)begin
-                    
-                    L1_hits <= L1_hits + 1;                   
-                    L2_hits <= L2_hits + 1;
-                        
-                end
-                
-                // If Hit on L2 & not on L1
-                else if(!L1_found && L2_found)begin
-                
-                     // Miss in L1
-                    L1_misses <= L1_misses + 1;
-                        
-                    if(write_policy == 1 && cache_op == 7'h57)begin
-                        L1_writes <= L1_writes + 1;
+                // L2 Cache | If tag found in cache, mark as found and mark LRU tag index
+                for(i = 0; i < L2_ASSOC; i = i + 1)begin        
+                    if(curr_tag == L2_cache[L2_index][i])begin
+                            L2_found <= 1'b1;
+                            L2_hits <= L2_hits + 1;
+                            break;
                     end
-
-                    // Hit in L2
-                    L2_hits <= L2_hits + 1;
-                        
-                end
-                
-                // If Hit on L1 & not on L2
-                else if(L1_found && !L2_found)begin
-                
-                    // Miss in L2
-                    L2_misses <= L2_misses + 1;
-                    if(write_policy == 1 && cache_op == 7'h57)
-                        L2_writes <= L2_writes + 1;
-
-                    // Hit in L1
-                    L1_hits <= L1_hits + 1;
-                    
-                end
-                
-                // If tag is not found in either cache, increment misses and reads for each cache
-                else begin
-                    
-                    //L1_misses = L1_misses + 1;
-                    L2_misses = L2_misses + 1;
-                    //L1_reads = L1_reads + 1;
-                    L2_reads = L1_reads + 1;
-                    
-                    // If write back & W operation increment writes for L2 and L1 cache
-                    if(write_policy == 1 && cache_op == 7'h57)begin                        
-                        L1_writes <= L1_writes + 1;
-                        L2_writes <= L2_writes + 1;
-                    end
-                    
-                end
+                end 
             end
             
             // LRU
@@ -293,7 +243,7 @@ module cache_engine(
                 // I
                 if(cache_lvl)begin
                 
-                    if(replace_policy == 1)begin
+                    if(replace_policy == 1 || replace_policy == 0)begin
                         L1_misses <= L1_misses + 1;
                         L1_reads <= L1_reads + 1;
                         if(write_policy == 1 && cache_op == 7'h57)begin
@@ -329,7 +279,7 @@ module cache_engine(
                 end
 
                 else begin
-                    if(replace_policy == 1)begin
+                    if(replace_policy == 1 || replace_policy == 0)begin
                         L2_misses <= L2_misses + 1;
                         L2_reads <= L2_reads + 1;
                         if(write_policy == 1 && cache_op == 7'h57)
@@ -386,7 +336,7 @@ module cache_engine(
                 // L1 Cache
                 if(cache_lvl)begin
                 
-                    if(replace_policy == 1)begin
+                    if(replace_policy == 1 || replace_policy == 0)begin
                         L1_misses <= L1_misses + 1;
                         L1_reads <= L1_reads + 1;
                         if(write_policy == 1 && cache_op == 7'h57)begin
