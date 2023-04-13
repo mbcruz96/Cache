@@ -29,7 +29,8 @@ module cache_tb();
     wire[11:0] L1_reads, L1_writes, L1_misses, L1_hits;
     wire[11:0] L2_reads, L2_writes, L2_misses, L2_hits;
     wire[31:0] curr_tag;
-    wire[31:0] Test [0:L1_NUMSETS-1][0:L1_ASSOC-1];
+    wire[31:0] cache1 [0:L1_NUMSETS-1][0:L1_ASSOC-1];
+    wire[31:0] cache2 [0:L2_NUMSETS-1][0:L2_ASSOC-1];
     reg[11:0] curr_set;
     parameter SIZE = 100;
     reg [47:0] test_addrs[0:SIZE-1] = 
@@ -239,8 +240,108 @@ module cache_tb();
     };
     
     // TODO: Add test which level will be accessed
-    //reg test_cache_lvl[0:SIZE-1]={
-    //};
+    reg test_cache_lvl[0:SIZE-1]={
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0,
+        1'b1,
+        1'b0
+    };
     
     real L1_miss_rate, L2_miss_rate;
     real L1misses, L1reads, L1hits, L1writes;
@@ -264,7 +365,8 @@ module cache_tb();
         .cache_op(cache_op),
         .curr_set(curr_set),
         .cache_lvl(cache_lvl),
-        .L1_cache(Test)
+        .L1_cache(cache1),
+        .L2_cache(cache2)
         );
     integer i;
     
@@ -282,8 +384,7 @@ module cache_tb();
     initial begin
         replace_policy = 1;
         write_policy = 1;
-        cache_lvl = 1;
-        inclusion_policy = 0;
+        inclusion_policy = 2;
         clk = 1;
         reset = 1;
         #10
@@ -292,6 +393,7 @@ module cache_tb();
         for(i = 0; i < SIZE; i=i+1)begin
             cache_addr = test_addrs[i];
             cache_op = test_ops[i];
+            cache_lvl = test_cache_lvl[i];
             #10;
         end
         
