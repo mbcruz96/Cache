@@ -38,7 +38,6 @@ module cache_engine(
       input[1:0] inclusion_policy,
       input[47:0] cache_addr,
       input[7:0] cache_op,
-      input cache_lvl,
       output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
       output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes,
       output reg[31:0] L1_index, L2_index,
@@ -71,34 +70,15 @@ module cache_engine(
         READ: next_state <= SEARCH;
         
         // Search for tag state
-        SEARCH:begin 
-            
-            // L1 Cache search
-            if(cache_lvl)begin 
-                
-                // FIFO
-                if(replace_policy == 0)begin
-                    next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
-                end
-
-                // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
-                else
-                    next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
+        SEARCH:begin
+            // FIFO
+            if(replace_policy == 0)begin
+                next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0 || L2_cache[L2_index][L2_ASSOC-1]) ? SHIFTEMPTY:SHIFTFULL;
             end
 
-            // L2 Cache search
-            else begin
-
-                // FIFO
-                if(replace_policy == 0)begin
-                    next_state <= (L1_found | L2_found) ? LRUHIT:(L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
-                end
-
-                // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
-                else
-                    next_state <= (L1_found | L2_found) ? LRUHIT:(L2_cache[L2_index][L2_ASSOC-1] != 0) ? SHIFTEMPTY:SHIFTFULL;
-            end
-            
+            // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
+            else
+                next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0 || L2_cache[L2_index][L2_ASSOC-1]) ? SHIFTEMPTY:SHIFTFULL;
         end
         
         // Shift if current cache is Full FIFO or Full LRU Miss
@@ -159,32 +139,19 @@ module cache_engine(
         if(next_state == READ)begin
             
             // L1 Cache input
-            if(cache_lvl)begin
-                L1_tag <= cache_addr / BLOCKSIZE;                   // Current Tag address derived from the input cache address
-                L1_index <= (cache_addr / BLOCKSIZE) % L1_NUMSETS;  // Current Set that the tag will go into
-                curr_tag <= L1_tag;
-                curr_set <= L1_index;
-            end
+            L1_tag <= cache_addr / (BLOCKSIZE * L1_NUMSETS);                   // Current Tag address derived from the input cache address
+            L1_index <= (cache_addr / BLOCKSIZE) % L1_NUMSETS;                 // Current Set that the tag will go into
 
             // L2 Cache input
-            else begin
-                L2_tag <= cache_addr / BLOCKSIZE;                   // Current Tag address derived from the input cache address
-                L2_index <= (cache_addr / BLOCKSIZE) % L2_NUMSETS;  // Current Set that the tag will go into
-                curr_tag <= L2_tag;
-                curr_set <= L2_index;
-            end
+            L2_tag <= cache_addr / (BLOCKSIZE * L2_NUMSETS);                   // Current Tag address derived from the input cache address
+            L2_index <= (cache_addr / BLOCKSIZE) % L2_NUMSETS;                 // Current Set that the tag will go into
             
             // If write through & W operation increment writes
             if(write_policy == 0 && cache_op == 8'h57)begin
-                
-                // L1 Writes
-                if(cache_lvl)
-                    L1_writes <= L1_writes + 1;
-                    
-                // L2 Writes
-                else
-                    L2_writes <= L2_writes + 1;
+                  L1_writes <= L1_writes + 1;
+                  L2_writes <= L2_writes + 1;
             end
+            
         end
         
         // Search for the tag within the current replacement policy, write policy, and inclusion policy
@@ -195,7 +162,7 @@ module cache_engine(
                 
                 // L1 Cache | If tag found in cache, mark as found and mark LRU tag index
                 for(i = 0; i < L1_ASSOC; i = i + 1)begin        
-                    if(curr_tag == L1_cache[L1_index][i])begin
+                    if(L1_tag == L1_cache[L1_index][i])begin
                             L1_found <= 1'b1;
                             L1_hits <= L1_hits + 1;
                             break;
@@ -204,7 +171,7 @@ module cache_engine(
 
                 // L2 Cache | If tag found in cache, mark as found and mark LRU tag index
                 for(i = 0; i < L2_ASSOC; i = i + 1)begin        
-                    if(curr_tag == L2_cache[L2_index][i])begin
+                    if(L2_tag == L2_cache[L2_index][i])begin
                             L2_found <= 1'b1;
                             L2_hits <= L2_hits + 1;
                             break;
@@ -217,7 +184,7 @@ module cache_engine(
                 
                 // L1 Cache | If tag found in cache, mark as found and mark LRU tag index
                 for(i = 0; i < L1_ASSOC; i = i + 1)begin        
-                    if(curr_tag == L1_cache[L1_index][i])begin
+                    if(L1_tag == L1_cache[L1_index][i])begin
                             L1_found <= 1'b1;
                             L1_hits <= L1_hits + 1;
                             L1_lru_index = i;
@@ -227,7 +194,7 @@ module cache_engine(
 
                 // L2 Cache | If tag found in cache, mark as found and mark LRU tag index
                 for(i = 0; i < L2_ASSOC; i = i + 1)begin        
-                    if(curr_tag == L2_cache[L2_index][i])begin
+                    if(L2_tag == L2_cache[L2_index][i])begin
                             L2_found <= 1'b1;
                             L2_hits <= L2_hits + 1;
                             L2_lru_index = i;
@@ -239,169 +206,76 @@ module cache_engine(
         
         // Shift logic if the cache for LRU or FIFO is full
         else if(next_state == SHIFTFULL)begin
+        
+                if(replace_policy == 1 || replace_policy == 0)begin
+                    L1_misses <= L1_misses + 1;
+                    L1_reads <= L1_reads + 1;
+                    L2_misses <= L2_misses + 1;
+                    L2_reads <= L2_misses + 1;
+                    if(write_policy == 1 && cache_op == 7'h57)begin
+                        L1_writes <= L1_writes + 1;
+                        L2_writes <= L2_writes + 1;
+                    end     
+                end
                 
-                // I
-                if(cache_lvl)begin
+                // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
+                if(inclusion_policy == 2)begin
                 
-                    if(replace_policy == 1 || replace_policy == 0)begin
-                        L1_misses <= L1_misses + 1;
-                        L1_reads <= L1_reads + 1;
-                        if(write_policy == 1 && cache_op == 7'h57)begin
-                            L1_writes <= L1_writes + 1;
-                        end     
-                    end
-                    // Pop out last address out of cache before shifting
                     L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
-                        
                     // Shifts through the current set with the size of the cache line to shift in FIFO order
                     for(i = L1_ASSOC; i > 0; i = i - 1)begin
                         L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                     end
                     
-                    // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
-                    if(inclusion_policy == 2 && !L2_found)begin
+                    if(L2_cache[L2_index][L2_ASSOC-1] != 0)
+                        L2_cache[L2_index][L2_ASSOC-1] <= 32'b0;
                     
-                        // Pop out last address out of cache before shifting
-                        L2_cache[L1_index][L2_ASSOC-1] <= 32'b0;
-                                
-                        // Shifts through the current set with the size of the cache line to shift in FIFO order
-                        for(i = L2_ASSOC; i > 0; i = i - 1)begin
-                            L2_cache[L1_index][i] <= L2_cache[L1_index][i-1];
-                        end
-                        
-                        // Insert tag entry from L1 into L2 Set from the L1 Set  
-                        L2_cache[L1_index][0] <= L1_tag;
-                        
-                    end
-                         
-                    // Insert new address at beginning of cache line
-                    L1_cache[L1_index][0] <= L1_tag;
-                end
-
-                else begin
-                    if(replace_policy == 1 || replace_policy == 0)begin
-                        L2_misses <= L2_misses + 1;
-                        L2_reads <= L2_reads + 1;
-                        if(write_policy == 1 && cache_op == 7'h57)
-                            L2_writes <= L2_writes + 1;
-                    end
-                    // Pop out last address out of cache before shifting
-                    L2_cache[L2_index][L2_ASSOC-1] <= 32'b0;
-                        
                     // Shifts through the current set with the size of the cache line to shift in FIFO order
                     for(i = L2_ASSOC; i > 0; i = i - 1)begin
                         L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
                     end
-                    
-                    // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
-                    if(inclusion_policy == 2 && !L1_found)begin
                             
-                            // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
-                            if(L2_index > L1_ASSOC)begin
-                                // Pop out last address out of cache before shifting
-                                L1_cache[0][L1_ASSOC-1] <= 32'b0;
-                                    
-                                // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
-                                    L1_cache[0][i] <= L1_cache[0][i-1];
-                                end
-                                
-                                // Insert tag entry from L2 into L1 Set from the 1st L1 Set 
-                                L1_cache[0][0] <= L2_tag;
-                            end
-                            
-                            // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
-                            else begin
-                                // Pop out last address out of cache before shifting
-                                L1_cache[L2_index][L1_ASSOC-1] <= 32'b0;
-                                    
-                                // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
-                                    L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
-                                end
-                                
-                                // Insert tag entry from L2 into L1 Set from the L2 Set 
-                                L1_cache[L2_index][0] <= L2_tag;
-                            end     
-                    end
-                        
-                    // Insert new address at beginning of cache line
                     L2_cache[L2_index][0] <= L2_tag;
-                end
+                        
+                end    
+                // Insert new address at beginning of cache line
+                L1_cache[L1_index][0] <= L1_tag;
         end
         
         // Shift logic if the cache for LRU or FIFO isn't full
         else if(next_state == SHIFTEMPTY)begin
 
-                // L1 Cache
-                if(cache_lvl)begin
+                if(replace_policy == 1 || replace_policy == 0)begin
+                    L1_misses <= L1_misses + 1;
+                    L1_reads <= L1_reads + 1;
+                    L2_misses <= L2_misses + 1;
+                    L2_reads <= L2_misses + 1;
+                    if(write_policy == 1 && cache_op == 7'h57)begin
+                        L1_writes <= L1_writes + 1;
+                        L2_writes <= L2_writes + 1;
+                    end     
+                end
+   
+                // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
+                if(inclusion_policy == 2)begin
                 
-                    if(replace_policy == 1 || replace_policy == 0)begin
-                        L1_misses <= L1_misses + 1;
-                        L1_reads <= L1_reads + 1;
-                        if(write_policy == 1 && cache_op == 7'h57)begin
-                            L1_writes <= L1_writes + 1;
-                        end     
-                    end
                     // Shifts through the current set with the size of the cache line to shift in FIFO order
                     for(i = L1_ASSOC; i > 0; i = i - 1)begin
                         L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                     end
-                    
-                    // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
-                    if(inclusion_policy == 2)begin
-                    
-                        // Pop out last address out of cache before shifting
-                        L2_cache[L1_index][L2_ASSOC-1] <= 32'b0;
+                    // Pop out last address out of cache before shifting
+                    //L2_cache[L2_index][L2_ASSOC-1] <= 32'b0;
                                 
-                        // Shifts through the current set with the size of the cache line to shift in FIFO order
-                        for(i = L2_ASSOC; i > 0; i = i - 1)begin
-                            L2_cache[L1_index][i] <= L2_cache[L1_index][i-1];
-                        end
-                            
-                        L2_cache[L1_index][0] <= L1_tag;
-                        
-                    end    
-                    // Insert new address at beginning of cache line
-                    L1_cache[L1_index][0] <= L1_tag;
-                end
-
-                // L2 Cache
-                else begin
                     // Shifts through the current set with the size of the cache line to shift in FIFO order
                     for(i = L2_ASSOC; i > 0; i = i - 1)begin
                         L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
                     end
-                    
-                    // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
-                    if(inclusion_policy == 2)begin
-                        //if(L1_found == 0 && L2_found == 0)
-                            if(L2_index > L1_ASSOC)begin
-                                // Pop out last address out of cache before shifting
-                                L1_cache[0][L1_ASSOC-1] <= 32'b0;
-                                    
-                                // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
-                                    L1_cache[0][i] <= L1_cache[0][i-1];
-                                end
-                                L1_cache[0][0] <= L2_tag;
-                            end
                             
-                            else begin
-                                // Pop out last address out of cache before shifting
-                                L1_cache[L2_index][L1_ASSOC-1] <= 32'b0;
-                                    
-                                // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
-                                    L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
-                                end
-                                L1_cache[L2_index][0] <= L2_tag;
-                            end
-                                
-                    end
-                    // Insert new address at beginning of cache line
                     L2_cache[L2_index][0] <= L2_tag;
-                end
+                        
+                end    
+                // Insert new address at beginning of cache line
+                L1_cache[L1_index][0] <= L1_tag;
         end
 
         // Shift logic for LRU hit
@@ -410,7 +284,7 @@ module cache_engine(
                 if(replace_policy == 1)begin
                     
                     // L1 cache
-                    if(cache_lvl)begin
+                    if(L1_found)begin
                         // Pop out LRU hit tag out of cache before shifting
                         L1_cache[L1_index][L1_lru_index] <= 32'b0;
                             
@@ -426,8 +300,13 @@ module cache_engine(
                     end
     
                     // L2 cache
-                    else begin
-    
+                    else if(!L1_found && L2_found) begin
+                    
+                        L1_misses <= L1_misses + 1;
+                        L1_reads <= L1_reads + 1;
+                        if(write_policy == 1 && cache_op == 7'h57)begin
+                            L1_writes <= L1_writes + 1;
+                        end     
                         // Pop out LRU hit tag out of cache before shifting
                         L2_cache[L2_index][L2_lru_index] <= 32'b0;
                             
@@ -439,8 +318,39 @@ module cache_engine(
                         end
                             
                         // Insert new address at beginning of cache line
-                        L2_cache[L2_index][0] <= L2_tag;     
+                        L2_cache[L2_index][0] <= L2_tag;
+                        
+                        if(inclusion_policy == 2)begin
+                            // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
+                            if(L2_index > L1_ASSOC)begin
+                                // Pop out last address out of cache before shifting
+                                L1_cache[0][L1_ASSOC-1] <= 32'b0;
+                                        
+                                // Shifts through the current set with the size of the cache line to shift in FIFO order
+                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                                    L1_cache[0][i] <= L1_cache[0][i-1];
+                                end
+                                    
+                                // Insert tag entry from L2 into L1 Set from the 1st L1 Set 
+                                L1_cache[0][0] <= L2_tag;
+                            end
+                                
+                            // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
+                            else begin
+                                // Pop out last address out of cache before shifting
+                                L1_cache[L2_index][L1_ASSOC-1] <= 32'b0;
+                                        
+                                // Shifts through the current set with the size of the cache line to shift in FIFO order
+                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                                    L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
+                                end
+                                    
+                                // Insert tag entry from L2 into L1 Set from the L2 Set 
+                                L1_cache[L2_index][0] <= L2_tag;
+                            end   
+                        end
                     end
+                        
                 end
                 L1_found <= 1'b0;
                 L2_found <= 1'b0;
