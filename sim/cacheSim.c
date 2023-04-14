@@ -3,30 +3,40 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ourHeaders.h"
+#include <math.h>
+typedef struct Block
+{
+    int validBit;
+    int dirtyBit;
+    
+    int tag;
+    int offset;
+
+    int index;
+} Block;
+
+typedef struct Set
+{
+    Block *blocks;
+    int index;
+    int LRU;
+} Set;
 
 typedef struct CacheLevel
 {
     int level;
     int cacheSize;
     int associativity;
-    int sets;
+    int numSets;
+    Set *sets;
 } CacheLevel;
 
-// typedef struct Block
-// {
-//     int validBit = 0;
-//     int dirtyBit = 0;
-    
-//     int tag;
-//     int LRU;
-//     int offset;
-// } Block;
-
-// typedef struct Set
-// {
-//     Block *blocks;
-//     int index;
-// } Set;
+typedef struct Node
+{
+    Block *data;
+    struct Node *next;
+    struct Node *previous;
+} Node;
 
 bool isPowerOfTwo(int x);
 
@@ -36,7 +46,8 @@ int checkCacheAssoc(char *input, int assoc);
 int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
-
+Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
+Set *getSets(int numSets, int associativity);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 void printInfo();
 void printCache();
@@ -80,14 +91,23 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    int l1Sets = L1_CACHE_SIZE / (L1_ASSOCIATIVITY * BLOCK_SIZE);
-    if (!isPowerOfTwo(l1Sets))
+    char operation;
+    unsigned long long int address;
+    int numCacheSets[2];
+
+    // avoid divide by zero error if associativity is 0
+    numCacheSets[0] = L1_ASSOCIATIVITY <= 0 ? 0 : L1_CACHE_SIZE / (L1_ASSOCIATIVITY * BLOCK_SIZE);
+
+    if (!isPowerOfTwo(numCacheSets[0]))
     {
         printf("L1 sets is not a power of 2, please re check values\n");
         return 1;
     }
-    int l2Sets = L2_CACHE_SIZE / (L2_ASSOCIATIVITY * BLOCK_SIZE);
-    if (!isPowerOfTwo(l2Sets))
+
+    // avoid divide by zero error if associativity is 0
+    numCacheSets[1] = L2_ASSOCIATIVITY <= 0 ? 0 : L2_CACHE_SIZE / (L2_ASSOCIATIVITY * BLOCK_SIZE);
+
+    if (!isPowerOfTwo(numCacheSets[1]))
     {
         printf("L2 sets is not a power of 2, please re check values\n");
         return 1;
@@ -97,43 +117,54 @@ int main(int argc, char *argv[])
     int num_of_cache_levels = 2;
     MAIN_CACHE = malloc(num_of_cache_levels * sizeof(CacheLevel *));
 
-    MAIN_CACHE[0] = createCacheLevel(1, L1_CACHE_SIZE, L1_ASSOCIATIVITY, l1Sets);
-    MAIN_CACHE[1] = createCacheLevel(2, L2_CACHE_SIZE, L2_ASSOCIATIVITY, l2Sets);
+    MAIN_CACHE[0] = createCacheLevel(1, L1_CACHE_SIZE, L1_ASSOCIATIVITY, numCacheSets[0]);
+    MAIN_CACHE[1] = createCacheLevel(2, L2_CACHE_SIZE, L2_ASSOCIATIVITY, numCacheSets[1]);
 
-    // read file for debuging
-    // char line[256];
-    // while (fgets(line, sizeof(line), INPUT_FILE)) {
-    //     printf("%s", line);
-    //     // check if read or write
-    //     // if read
-    //         // check the hash map for the tag and is valid
-    //         // if it is in the hash map
-    //             // if its in the map for L1 cache
-    //                 // update the LRU
-    //                     // move to the front of the linked list
-    //                 // update the hit counter
-    //             // else  check L2 cache
-    //                 // update the miss counter
-    //                 // update the LRU
-    //                     // move to the front of the linked list
-    //                 // update the hash map
-    //                 // update the hit counter
-    //             // else not found
-    //                 // update the miss counter for all previous caches
-    //                 // create a new block
-    //                 // depending on the inclusion policy
-    //                     // if inclusive
-    //                         // update the LRU
-    //                             // move to the front of the linked list
-    //                         // update the hash map
-    //                         // update the hash map of all caches
-    //                         // if L1 is full evict the LRU block
-    //                     // if non-inclusive
-    //                         // update the LRU
-    //                             // move to the front of the linked list
-    //                         // update the hash map of only L1
-    //                         // if L1 is full evict the LRU block into next level
-    //                             // update the hash map of all caches
+    printInfo();
+    printCache();
+    // read file for debugging
+    while (!feof(INPUT_FILE)) {
+        fscanf(INPUT_FILE, " %c %llx", &operation, &address);
+        Block blockAddress = createMemoryAddress(operation, address, numCacheSets);
+        if(operation == 'r'){
+            // printf("L1 read: %llx (tag: %llx, index: %d)\n", address, tag, index);
+            // check the hash map for the tag and is valid
+            // current version checks each cache for tag
+            checkTag(blockAddress);
+            // if it is in the hash map
+                // if its in the map for L1 cache
+                    // update the LRU
+                        // move to the front of the linked list
+                    // update the hit counter
+                // else  check L2 cache
+                    // update the miss counter
+                    // update the LRU
+                        // move to the front of the linked list
+                    // update the hash map
+                    // update the hit counter
+                // else not found
+                    // update the miss counter for all previous caches
+                    // create a new block
+                    // depending on the inclusion policy
+                        // if inclusive
+                            // update the LRU
+                                // move to the front of the linked list
+                            // update the hash map
+                            // update the hash map of all caches
+                            // if L1 is full evict the LRU block
+                        // if non-inclusive
+                            // update the LRU
+                                // move to the front of the linked list
+                            // update the hash map of only L1
+                            // if L1 is full evict the LRU block into next level
+                                // update the hash map of all caches
+
+        } else if (operation == 'w'){
+            // printf("write address:%llx (tag: %llx)\n", address, address/BLOCK_SIZE);
+        } else {
+            printf("error in file\n");
+            return 1;
+        }
     //     // if write 
     //         // do all the same shit
     //         // update the dirty bit to 1
@@ -143,11 +174,17 @@ int main(int argc, char *argv[])
     //             // this would determin if we put it back to mem or discar, may not apply to us
 
     //     // we will need 3 evict policies lru, fifo, and optimal
-    // }
-
-    printInfo();
-    printCache();
-
+    }
+    
+    for (int i = 0; i < 2; i++){
+        for (int j = 0; j < numCacheSets[i]; j++){
+            free(MAIN_CACHE[i]->sets[j].blocks);
+        }
+        free(MAIN_CACHE[i]->sets);
+        free(MAIN_CACHE[i]);
+    }
+    free(MAIN_CACHE);
+    fclose(INPUT_FILE);
     return 0;
 }
 
@@ -296,13 +333,63 @@ int checkTraceFile(char *input) {
     return 0;
 }
 
+Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets){
+        // check if read or write
+    int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
+    int blockOffset = log2(BLOCK_SIZE);
+    int indexBits = log2(MAIN_CACHE[0]->numSets);
+
+    //produce mask to extract the offset bits
+    int offset = address & ((1 << blockOffset)-1);
+    //remove offset bits value from address but keep length
+    address = address ^ offset;
+    // printf("Read:  %llx\n", address);
+
+    // shift address by offset and & with mask to get index
+    int index = (address >> (blockOffset)) & ((1 << indexBits)-1);
+    // printf("index: %x\n", index);
+
+    //extract tag bits by shifting
+    unsigned long long int tag = address >> tagBits;
+    // printf("tag: %llx\n", tag);
+    Block block;
+    if(operation != 'r'){
+        block.dirtyBit = 1;
+    }else{
+        block.dirtyBit = 0;
+    }
+    block.index = index;
+    block.validBit = 1;
+    block.offset = offset;
+    block.tag = tag;
+    
+    return block;
+}
+
+Set *getSets(int numSets, int associativity){
+    printf("number of sets: %d", numSets);
+    Set *sets = (Set *)malloc(sizeof(Set) * numSets);
+    for (int i = 0; i < numSets; i++){
+        sets[i].index = i;
+        sets[i].blocks = (Block *)malloc(sizeof(Block) * (associativity));
+        for (int j = 0; j < associativity; j++){
+            sets[i].blocks[j].validBit = 0;
+            sets[i].blocks[j].dirtyBit = 0;
+        }
+    }
+    return sets;
+}
+
 // A utility function to create a cache level
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets) {
     CacheLevel *cache = (CacheLevel *)malloc(sizeof(CacheLevel));
     cache->level = level;
     cache->cacheSize = cacheSize;
     cache->associativity = associativity;
-    cache->sets = numSets;
+    cache->numSets = numSets;
+    
+    cache->sets = getSets(numSets, associativity);
+
     return cache;
 }
 
@@ -340,6 +427,6 @@ void printCache() {
             MAIN_CACHE[i]->level, 
             MAIN_CACHE[i]->cacheSize, 
             MAIN_CACHE[i]->associativity, 
-            MAIN_CACHE[i]->sets);
+            MAIN_CACHE[i]->numSets);
     }
 }
