@@ -4,22 +4,28 @@
 #include <string.h>
 #include "ourHeaders.h"
 #include <math.h>
+
 typedef struct Block
 {
     int validBit;
     int dirtyBit;
-    
     int tag;
     int offset;
-
     int index;
 } Block;
 
+typedef struct Node{
+    struct Block data;
+    struct Node *next;
+    struct Node *previous;
+}Node;
+
 typedef struct Set
 {
-    Block *blocks;
-    int index;
-    int LRU;
+    struct Node *head;
+    struct Node *tail;
+    int size;
+    int capacity;
 } Set;
 
 typedef struct CacheLevel
@@ -31,12 +37,6 @@ typedef struct CacheLevel
     Set *sets;
 } CacheLevel;
 
-typedef struct Node
-{
-    Block *data;
-    struct Node *next;
-    struct Node *previous;
-} Node;
 
 bool isPowerOfTwo(int x);
 
@@ -46,8 +46,8 @@ int checkCacheAssoc(char *input, int assoc);
 int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
+int checkTagLRU(int operation, Block blockAddress);
 Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
-Set *getSets(int numSets, int associativity);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 void printInfo();
 void printCache();
@@ -60,7 +60,7 @@ int L1_ASSOCIATIVITY = -1;
 int L2_CACHE_SIZE = -1;
 int L2_ASSOCIATIVITY = -1;
 
-char *REPLACEMENT_POLICY = NULL;
+int REPLACEMENT_POLICY = -1;
 char *INCLUSION_PROPERTY = NULL;
 
 char *TRACE_FILE_NAME = NULL;
@@ -91,8 +91,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    char operation;
-    unsigned long long int address;
+    char *operation = malloc(3 * sizeof(char));
+    int opIntRep = 0;
+    unsigned long long int address = 0;
     int numCacheSets[2];
 
     // avoid divide by zero error if associativity is 0
@@ -121,68 +122,46 @@ int main(int argc, char *argv[])
     MAIN_CACHE[1] = createCacheLevel(2, L2_CACHE_SIZE, L2_ASSOCIATIVITY, numCacheSets[1]);
 
     printInfo();
-    printCache();
     // read file for debugging
     while (!feof(INPUT_FILE)) {
-        fscanf(INPUT_FILE, " %c %llx", &operation, &address);
-        Block blockAddress = createMemoryAddress(operation, address, numCacheSets);
-        if(operation == 'r'){
-            // printf("L1 read: %llx (tag: %llx, index: %d)\n", address, tag, index);
-            // check the hash map for the tag and is valid
-            // current version checks each cache for tag
-            checkTag(blockAddress);
-            // if it is in the hash map
-                // if its in the map for L1 cache
-                    // update the LRU
-                        // move to the front of the linked list
-                    // update the hit counter
-                // else  check L2 cache
-                    // update the miss counter
-                    // update the LRU
-                        // move to the front of the linked list
-                    // update the hash map
-                    // update the hit counter
-                // else not found
-                    // update the miss counter for all previous caches
-                    // create a new block
-                    // depending on the inclusion policy
-                        // if inclusive
-                            // update the LRU
-                                // move to the front of the linked list
-                            // update the hash map
-                            // update the hash map of all caches
-                            // if L1 is full evict the LRU block
-                        // if non-inclusive
-                            // update the LRU
-                                // move to the front of the linked list
-                            // update the hash map of only L1
-                            // if L1 is full evict the LRU block into next level
-                                // update the hash map of all caches
+        fscanf(INPUT_FILE, " %s %llx", operation, &address);
+        // printf("%s %llx", operation, address);
 
-        } else if (operation == 'w'){
-            // printf("write address:%llx (tag: %llx)\n", address, address/BLOCK_SIZE);
-        } else {
-            printf("error in file\n");
-            return 1;
+        if(operation != NULL && strcmp(operation, "r")){
+            opIntRep = 0;
         }
-    //     // if write 
-    //         // do all the same shit
-    //         // update the dirty bit to 1
+        else if(operation != NULL && strcmp(operation, "w")){
+            opIntRep = 1;
+        }
+        else if(operation != NULL && strcmp(operation, "wb")){
+            opIntRep = 2;
+        }
+        else if(operation != NULL && strcmp(operation, "wt")){
+            opIntRep = 3;
+        }
 
-    //     // when evecting 
-    //         // check the dirty bit
-    //             // this would determin if we put it back to mem or discar, may not apply to us
-
-    //     // we will need 3 evict policies lru, fifo, and optimal
+        Block blockAddress = createMemoryAddress(opIntRep, address, numCacheSets);
+        int found = checkTagLRU(opIntRep, blockAddress);
     }
     
+    printCache();
+
     for (int i = 0; i < 2; i++){
         for (int j = 0; j < numCacheSets[i]; j++){
-            free(MAIN_CACHE[i]->sets[j].blocks);
+            //free each node from all sets
+            Node *current = MAIN_CACHE[i]->sets[j].head;
+            while (current != NULL){
+                Node *temp = current;
+                current = current->next;
+                free(temp);
+            }
+
+            free(MAIN_CACHE[i]->sets);
         }
         free(MAIN_CACHE[i]->sets);
         free(MAIN_CACHE[i]);
     }
+
     free(MAIN_CACHE);
     fclose(INPUT_FILE);
     return 0;
@@ -288,9 +267,19 @@ int checkReplacementPolicy(char *input) {
     }
 
     // convert input string to int
-    REPLACEMENT_POLICY = input;
-    if (strcmp(REPLACEMENT_POLICY, "LRU") || strcmp(REPLACEMENT_POLICY, "FIFO") || strcmp(REPLACEMENT_POLICY, "OPTIMAL"))
+    if (strcmp(input, "LRU"))
     {
+        REPLACEMENT_POLICY = 1;
+        return 0;
+    }
+    if (strcmp(input, "FIFO"))
+    {
+        REPLACEMENT_POLICY = 2;
+        return 0;
+    }
+    if (strcmp(input, "OPTIMAL"))
+    {
+        REPLACEMENT_POLICY = 2;
         return 0;
     }
     printf(">>> Replacement policy must be LRU, FIFO, or OPTIMAL\n");
@@ -333,6 +322,114 @@ int checkTraceFile(char *input) {
     return 0;
 }
 
+void moveToFront(Node *temp, Set set){
+
+    // if list is empty
+    if(set.head == NULL){
+        // printf("inserted %x into index %i\n", temp->data.tag, temp->data.index);
+        set.head = temp;
+        set.tail = temp;   
+        return;
+    }
+    Node *ptr = temp;
+    //if the entry is new
+    if(ptr->next == NULL && ptr->previous == NULL){
+        if(set.head != NULL){
+            set.head->previous = ptr;
+        }
+        ptr->next = set.head;
+        set.head = ptr;
+        // printf("inserted %x into index %i\n", temp->data.tag, temp->data.index);
+
+        return;
+    }
+
+    //cut out of list
+    ptr->previous->next = ptr->next;
+    if(ptr->next != NULL){
+        ptr->next->previous = ptr->previous;
+    }
+    // move to head
+    ptr->next = set.head;
+    ptr->previous = NULL;
+    set.head->previous = ptr;
+    set.head = ptr;
+    // printf("inserted %x into index %i\n", temp->data.tag, temp->data.index);
+
+    return;
+}
+
+int checkTagLRU(int operation, Block blockAddress){
+    
+    // check eaach cache level
+    for (int currentLevel = 0; currentLevel < 2; currentLevel++){
+        //check each set
+
+        for (int currentSet = 0; currentSet < MAIN_CACHE[currentLevel]->numSets; currentSet++){
+            Node *ptr = MAIN_CACHE[currentLevel]->sets[currentSet].head;
+
+            // checking each node in set
+            while(ptr != NULL){
+                if(ptr->data.tag == blockAddress.tag){
+                    //if writethrough or writeback
+                    if(operation != 0){
+                        ptr->data.dirtyBit = 1;
+                    }
+                    //if not head
+                    if(ptr->previous != NULL){
+                        //move to head
+                        moveToFront(ptr, MAIN_CACHE[currentLevel]->sets[currentSet]);
+                    }
+                    return 1;
+                }
+                ptr = ptr->next;
+                
+            }
+        }
+    }
+
+    //insert into index needed
+    Node *newNode = (Node*)malloc(sizeof(Node));
+    newNode->data = blockAddress;
+    newNode->next = NULL;
+    newNode->previous = NULL;
+    // move to front
+    moveToFront(newNode, MAIN_CACHE[0]->sets[blockAddress.index]);
+
+    //increase size
+    MAIN_CACHE[0]->sets[blockAddress.index].size += 1;
+    //print current set
+    Node *ptr = MAIN_CACHE[0]->sets[blockAddress.index].head;
+    while(ptr != NULL){
+        printf("tag: %x, index: %d\n", ptr->data.tag, ptr->data.index);
+        ptr = ptr->next;
+    }
+    // printf("\n");
+    
+
+    // evict LRU node
+    if(MAIN_CACHE[0]->sets[blockAddress.index].head != NULL){
+        if(MAIN_CACHE[0]->sets[blockAddress.index].size > MAIN_CACHE[0]->sets[blockAddress.index].capacity){
+            printf("in if tag\n");
+
+            Node *deleteNode = MAIN_CACHE[0]->sets[blockAddress.index].tail;
+            // printf("1\n");
+            deleteNode->previous->next = NULL;
+            // printf("2\n");
+            MAIN_CACHE[0]->sets[blockAddress.index].tail = deleteNode->previous;
+            // printf("3\n");
+            free(deleteNode);
+            // printf("4\n");
+
+            MAIN_CACHE[0]->sets[blockAddress.index].size -= 1;
+            // printf("5\n");
+        }   
+    }
+    // printf("end of tag\n");
+
+    return 0;
+}
+
 Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets){
         // check if read or write
     int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
@@ -352,8 +449,11 @@ Block createMemoryAddress(int operation, unsigned long long int address, int* nu
     //extract tag bits by shifting
     unsigned long long int tag = address >> tagBits;
     // printf("tag: %llx\n", tag);
-    Block block;
-    if(operation != 'r'){
+    // initialize 
+    Block block = {0, 0, 0, 0, 0};
+
+    // if not read
+    if(operation != 0){
         block.dirtyBit = 1;
     }else{
         block.dirtyBit = 0;
@@ -366,20 +466,6 @@ Block createMemoryAddress(int operation, unsigned long long int address, int* nu
     return block;
 }
 
-Set *getSets(int numSets, int associativity){
-    printf("number of sets: %d", numSets);
-    Set *sets = (Set *)malloc(sizeof(Set) * numSets);
-    for (int i = 0; i < numSets; i++){
-        sets[i].index = i;
-        sets[i].blocks = (Block *)malloc(sizeof(Block) * (associativity));
-        for (int j = 0; j < associativity; j++){
-            sets[i].blocks[j].validBit = 0;
-            sets[i].blocks[j].dirtyBit = 0;
-        }
-    }
-    return sets;
-}
-
 // A utility function to create a cache level
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets) {
     CacheLevel *cache = (CacheLevel *)malloc(sizeof(CacheLevel));
@@ -388,7 +474,14 @@ CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int nu
     cache->associativity = associativity;
     cache->numSets = numSets;
     
-    cache->sets = getSets(numSets, associativity);
+    cache->sets = (Set *)malloc(sizeof(Set) * numSets);
+    
+    for (int i = 0; i < numSets; i++){
+        cache->sets[i].size = 0;
+        cache->sets[i].capacity = associativity;
+        cache->sets[i].head = NULL;
+        cache->sets[i].tail = NULL;        
+    }
 
     return cache;
 }
@@ -407,7 +500,18 @@ void printInfo() {
     }
 
     // Replacement Policy
-    printf("REPLACEMENT POLICY:\t%s\n", REPLACEMENT_POLICY);
+    if (REPLACEMENT_POLICY == 1)
+    {
+        printf("REPLACEMENT POLICY:\tLRU\n");
+    }
+    else if (REPLACEMENT_POLICY == 2)
+    {
+        printf("REPLACEMENT POLICY:\tFIFO\n");
+    }
+    else if (REPLACEMENT_POLICY == 3)
+    {
+        printf("REPLACEMENT POLICY:\tOptimal\n");
+    }
 
     // Inclusion Policy
     printf("INCLUSION PROPERTY:\t%s\n", INCLUSION_PROPERTY);
@@ -421,12 +525,42 @@ void printInfo() {
 void printCache() {
     // print the main cache to check if it works
     int num_of_cache_levels = 2;
+    // Node *ptr;
+    // for (int i = 0; i < num_of_cache_levels; i++)
+    // {
+    //     printf("===== L%d contents =====\n", i + 1);
+    //     for(int j = 0; j < MAIN_CACHE[i]->numSets; j++){
+    //         printf("Set %d: ", j);
+    //         while(ptr->next != NULL){
+    //             printf("%x %c", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
+    //         }
+    //     }
+    // }
+    // print out blocks in each set and cache
     for (int i = 0; i < num_of_cache_levels; i++)
     {
-        printf("Level: %d, Cache Size: %d, Associativity: %d, Sets: %d\n", 
-            MAIN_CACHE[i]->level, 
-            MAIN_CACHE[i]->cacheSize, 
-            MAIN_CACHE[i]->associativity, 
-            MAIN_CACHE[i]->numSets);
+        printf("===== L%d contents =====\n", (i + 1));
+        printf("wow %i\n", i);
+        if(MAIN_CACHE[i]->numSets){
+            printf("%i \n", MAIN_CACHE[i]->numSets);
+        }
+                printf("wow %i\n", i);
+
+        printf("number of sets here %i: ", MAIN_CACHE[i]->numSets);
+
+        for (int j = 0; j < MAIN_CACHE[i]->numSets; j++)
+        {
+            printf("Set %d: ", j);
+            Node *ptr = MAIN_CACHE[i]->sets[j].head;
+            printf("data here is %x\n", ptr->data.tag);
+
+
+            while (ptr != NULL)
+            {
+                printf("%x %c ", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
+                ptr = ptr->next;
+            }
+            printf("\n");
+        }
     }
 }
