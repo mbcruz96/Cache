@@ -4,22 +4,27 @@
 #include <string.h>
 #include "ourHeaders.h"
 #include <math.h>
+
 typedef struct Block
 {
     int validBit;
     int dirtyBit;
-    
     int tag;
     int offset;
-
     int index;
+    int LRU;
 } Block;
+
+typedef struct Node{
+    struct Block *data;
+    struct Node *next;
+    struct Node *previous;
+}Node;
 
 typedef struct Set
 {
-    Block *blocks;
-    int index;
-    int LRU;
+    struct Node *head;
+    struct Node *tail;
 } Set;
 
 typedef struct CacheLevel
@@ -31,13 +36,6 @@ typedef struct CacheLevel
     Set *sets;
 } CacheLevel;
 
-typedef struct Node
-{
-    Block *data;
-    struct Node *next;
-    struct Node *previous;
-} Node;
-
 bool isPowerOfTwo(int x);
 
 int checkBlock(char *input);
@@ -47,7 +45,6 @@ int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
 Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
-Set *getSets(int numSets, int associativity);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 void printInfo();
 void printCache();
@@ -60,13 +57,15 @@ int L1_ASSOCIATIVITY = -1;
 int L2_CACHE_SIZE = -1;
 int L2_ASSOCIATIVITY = -1;
 
-char *REPLACEMENT_POLICY = NULL;
-char *INCLUSION_PROPERTY = NULL;
+int REPLACEMENT_POLICY = -1;
+int INCLUSION_PROPERTY = -1;
 
 char *TRACE_FILE_NAME = NULL;
 FILE *INPUT_FILE = NULL;
 
 CacheLevel **MAIN_CACHE = NULL;
+
+
 
 int main(int argc, char *argv[])
 {
@@ -188,6 +187,51 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+void executeReplacementPolicy(Set* currSet, Block* newBlock)
+{
+    if (REPLACEMENT_POLICY == 0 || REPLACEMENT_POLICY == 1)
+    {
+        updateFIFOAndLRU(currSet, newBlock);
+    }
+    else if (REPLACEMENT_POLICY == 2)
+    {
+        updateOptimal(currSet, newBlock);
+    }
+}
+
+Block* updateFIFOAndLRU(Set* currSet, Block* newBlock)
+{
+    //create a new node to insert
+    Node* newNode = malloc(sizeof(Node));
+
+    //update the parameters of the new node
+    newNode->data = newBlock;
+    newNode->previous = NULL;
+    newNode->next = currSet->head;
+
+    //grab pointers to the hold head and tail so they arent lost
+    Node* oldHead = currSet->head;
+    Node* oldTail = currSet->tail;
+
+    //update previous of old head and next for new tail
+    oldHead->previous = newNode;
+    oldTail->previous->next = NULL;
+
+    //update head and tail of the set
+    currSet->head = newNode;
+    currSet->tail = oldTail->previous;
+
+    //return the evicted block
+    return(oldTail->data);
+}
+
+Block* updateOptimal(Set* currSet, Block* newBlock)
+{
+
+}
+
+
+
 // function to check if a number is a power of 2
 bool isPowerOfTwo(int x) {
     // 8 is 1000
@@ -287,12 +331,22 @@ int checkReplacementPolicy(char *input) {
         return -1;
     }
 
-    // convert input string to int
-    REPLACEMENT_POLICY = input;
-    if (strcmp(REPLACEMENT_POLICY, "LRU") || strcmp(REPLACEMENT_POLICY, "FIFO") || strcmp(REPLACEMENT_POLICY, "OPTIMAL"))
+    if(strcmp(input, "LRU") == 0)
     {
+        REPLACEMENT_POLICY = 0;
         return 0;
     }
+    else if(strcmp(input, "FIFO") == 0)
+    {
+        REPLACEMENT_POLICY = 1;
+        return 0;
+    }
+    else if(strcmp(input, "OPTIMAL") == 0)
+    {
+        REPLACEMENT_POLICY = 2;
+        return 0;
+    }
+
     printf(">>> Replacement policy must be LRU, FIFO, or OPTIMAL\n");
     return -1;
 }
@@ -304,12 +358,17 @@ int checkInclusionProperty(char *input) {
         return -1;
     }
 
-    // convert input string to int
-    INCLUSION_PROPERTY = input;
-    if (strcmp(INCLUSION_PROPERTY, "inclusive") || strcmp(INCLUSION_PROPERTY, "non-inclusive"))
+    if(strcmp(input, "inclusive") == 0)
     {
+        INCLUSION_PROPERTY = 0;
         return 0;
     }
+    else if(strcmp(input, "non-inclusive") == 0)
+    {
+        INCLUSION_PROPERTY = 1;
+        return 0;
+    }
+
     printf(">>> Inclusion property must be inclusive or non-inclusive\n");
     return -1;
 }
@@ -366,20 +425,6 @@ Block createMemoryAddress(int operation, unsigned long long int address, int* nu
     return block;
 }
 
-Set *getSets(int numSets, int associativity){
-    printf("number of sets: %d", numSets);
-    Set *sets = (Set *)malloc(sizeof(Set) * numSets);
-    for (int i = 0; i < numSets; i++){
-        sets[i].index = i;
-        sets[i].blocks = (Block *)malloc(sizeof(Block) * (associativity));
-        for (int j = 0; j < associativity; j++){
-            sets[i].blocks[j].validBit = 0;
-            sets[i].blocks[j].dirtyBit = 0;
-        }
-    }
-    return sets;
-}
-
 // A utility function to create a cache level
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets) {
     CacheLevel *cache = (CacheLevel *)malloc(sizeof(CacheLevel));
@@ -388,7 +433,7 @@ CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int nu
     cache->associativity = associativity;
     cache->numSets = numSets;
     
-    cache->sets = getSets(numSets, associativity);
+    cache->sets = (Set *)malloc(sizeof(Set) * numSets);
 
     return cache;
 }
