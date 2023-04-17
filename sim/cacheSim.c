@@ -26,6 +26,7 @@ typedef struct Set
     struct Node *tail;
     int size;
     int capacity;
+    int lru;
 } Set;
 
 typedef struct CacheLevel
@@ -46,9 +47,10 @@ int checkCacheAssoc(char *input, int assoc);
 int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
-int checkTagLRU(int operation, Block blockAddress);
-Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
+void checkTagLRU(int operation, Block *blockAddress);
+Block *createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
+void printSet(int setIndex, int cacheLevel);
 void printInfo();
 void printCache();
 
@@ -62,6 +64,8 @@ int L2_ASSOCIATIVITY = -1;
 
 int REPLACEMENT_POLICY = -1;
 char *INCLUSION_PROPERTY = NULL;
+
+int TOTAL_LEVELS = 0;
 
 char *TRACE_FILE_NAME = NULL;
 FILE *INPUT_FILE = NULL;
@@ -91,7 +95,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    char *operation = malloc(3 * sizeof(char));
+    char operation[2];
     int opIntRep = 0;
     unsigned long long int address = 0;
     int numCacheSets[2];
@@ -107,6 +111,12 @@ int main(int argc, char *argv[])
 
     // avoid divide by zero error if associativity is 0
     numCacheSets[1] = L2_ASSOCIATIVITY <= 0 ? 0 : L2_CACHE_SIZE / (L2_ASSOCIATIVITY * BLOCK_SIZE);
+
+    if(numCacheSets[1] > 0 && numCacheSets[0] > 0){
+        TOTAL_LEVELS = 2;
+    }else{
+        TOTAL_LEVELS = 1;
+    }
 
     if (!isPowerOfTwo(numCacheSets[1]))
     {
@@ -125,43 +135,42 @@ int main(int argc, char *argv[])
     // read file for debugging
     while (!feof(INPUT_FILE)) {
         fscanf(INPUT_FILE, " %s %llx", operation, &address);
-        // printf("%s %llx", operation, address);
+        //printf("read: %s %llx\n", operation, address);
 
-        if(operation != NULL && strcmp(operation, "r")){
+        if(strcmp(operation, "r")){
             opIntRep = 0;
         }
-        else if(operation != NULL && strcmp(operation, "w")){
+        else if(strcmp(operation, "w")){
             opIntRep = 1;
         }
-        else if(operation != NULL && strcmp(operation, "wb")){
+        else if(strcmp(operation, "wb")){
             opIntRep = 2;
         }
-        else if(operation != NULL && strcmp(operation, "wt")){
+        else if(strcmp(operation, "wt")){
             opIntRep = 3;
         }
+        Block *blockAddress = createMemoryAddress(opIntRep, address, numCacheSets);
+        checkTagLRU(opIntRep, blockAddress);
 
-        Block blockAddress = createMemoryAddress(opIntRep, address, numCacheSets);
-        int found = checkTagLRU(opIntRep, blockAddress);
+
     }
     
     printCache();
-
     for (int i = 0; i < 2; i++){
+        //printf("fgdfgsfgsdfg %i\n", numCacheSets[i]);
         for (int j = 0; j < numCacheSets[i]; j++){
-            //free each node from all sets
+            //printf("freeing nodes now\n");
             Node *current = MAIN_CACHE[i]->sets[j].head;
             while (current != NULL){
                 Node *temp = current;
                 current = current->next;
                 free(temp);
             }
-
-            free(MAIN_CACHE[i]->sets);
+            free(current);
         }
-        free(MAIN_CACHE[i]->sets);
+        free(MAIN_CACHE[i]->sets);        
         free(MAIN_CACHE[i]);
     }
-
     free(MAIN_CACHE);
     fclose(INPUT_FILE);
     return 0;
@@ -322,147 +331,144 @@ int checkTraceFile(char *input) {
     return 0;
 }
 
-void moveToFront(Node *temp, Set set){
-
+void placeNewNode(Node *temp, int currentLevel, int currentSet){
     // if list is empty
-    if(set.head == NULL){
-        // printf("inserted %x into index %i\n", temp->data.tag, temp->data.index);
-        set.head = temp;
-        set.tail = temp;   
-        return;
+    if(MAIN_CACHE[currentLevel]->sets[currentSet].head == NULL){
+        MAIN_CACHE[currentLevel]->sets[currentSet].head = temp;
+        MAIN_CACHE[currentLevel]->sets[currentSet].head->next = NULL;
+        MAIN_CACHE[currentLevel]->sets[currentSet].head->previous = NULL;
+        MAIN_CACHE[currentLevel]->sets[currentSet].tail = temp;   
+        MAIN_CACHE[currentLevel]->sets[currentSet].tail->next = NULL;   
+        MAIN_CACHE[currentLevel]->sets[currentSet].tail->next = NULL;   
+        return ;
     }
-    Node *ptr = temp;
-    //if the entry is new
-    if(ptr->next == NULL && ptr->previous == NULL){
-        if(set.head != NULL){
-            set.head->previous = ptr;
+    // if list is not empty
+    else{
+        temp->next = MAIN_CACHE[currentLevel]->sets[currentSet].head;
+        MAIN_CACHE[currentLevel]->sets[currentSet].head->previous = temp;
+        MAIN_CACHE[currentLevel]->sets[currentSet].head = temp;
+        MAIN_CACHE[currentLevel]->sets[currentSet].head->previous = NULL;
+        return ;
+    }
+
+}
+
+void moveToFront(Node *temp, int currentLevel, int currentSet){
+
+    Node *current = MAIN_CACHE[currentLevel]->sets[currentSet].head;
+    while (current != NULL)
+    {
+        if(current->data.tag == temp->data.tag){
+            //if the entry is already in the list
+            if(current->previous == NULL){
+                return;
+            }
+            //if the entry is at the end of the list
+            if(current->next == NULL){
+                MAIN_CACHE[currentLevel]->sets[currentSet].tail = current->previous;
+                MAIN_CACHE[currentLevel]->sets[currentSet].tail->next = NULL;
+                current->previous = NULL;
+                current->next = MAIN_CACHE[currentLevel]->sets[currentSet].head;
+                MAIN_CACHE[currentLevel]->sets[currentSet].head->previous = current;
+                MAIN_CACHE[currentLevel]->sets[currentSet].head = current;
+                return;
+            }
+            //if the entry is in the middle of the list
+            if(current->previous != NULL && current->next != NULL){
+                current->previous->next = current->next;
+                current->next->previous = current->previous;
+                current->previous = NULL;
+                current->next = MAIN_CACHE[currentLevel]->sets[currentSet].head;
+                MAIN_CACHE[currentLevel]->sets[currentSet].head->previous = current;
+                MAIN_CACHE[currentLevel]->sets[currentSet].head = current;
+                return;
+            }
         }
-        ptr->next = set.head;
-        set.head = ptr;
-        // printf("inserted %x into index %i\n", temp->data.tag, temp->data.index);
-
-        return;
-    }
-
-    //cut out of list
-    ptr->previous->next = ptr->next;
-    if(ptr->next != NULL){
-        ptr->next->previous = ptr->previous;
-    }
-    // move to head
-    ptr->next = set.head;
-    ptr->previous = NULL;
-    set.head->previous = ptr;
-    set.head = ptr;
-    // printf("inserted %x into index %i\n", temp->data.tag, temp->data.index);
+        current = current->next;
+    }    
 
     return;
 }
 
-int checkTagLRU(int operation, Block blockAddress){
+void checkTagLRU(int operation, Block *blockAddress){
     
-    // check eaach cache level
-    for (int currentLevel = 0; currentLevel < 2; currentLevel++){
+    // check each cache level
+    for (int currentLevel = 0; currentLevel < TOTAL_LEVELS; currentLevel++){
         //check each set
+        Node *ptr = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
+        while(ptr != NULL){
+            
+            if(ptr->data.tag == blockAddress[currentLevel].tag){
+                //if writethrough or writeback
 
-        for (int currentSet = 0; currentSet < MAIN_CACHE[currentLevel]->numSets; currentSet++){
-            Node *ptr = MAIN_CACHE[currentLevel]->sets[currentSet].head;
-
-            // checking each node in set
-            while(ptr != NULL){
-                if(ptr->data.tag == blockAddress.tag){
-                    //if writethrough or writeback
-                    if(operation != 0){
-                        ptr->data.dirtyBit = 1;
-                    }
-                    //if not head
-                    if(ptr->previous != NULL){
-                        //move to head
-                        moveToFront(ptr, MAIN_CACHE[currentLevel]->sets[currentSet]);
-                    }
-                    return 1;
+                //if not head
+                if(ptr->previous != NULL){
+                    //move to head
+                    moveToFront(ptr, currentLevel, blockAddress[currentLevel].index);
                 }
-                ptr = ptr->next;
-                
+                return;
             }
+            ptr = ptr->next;
         }
     }
 
     //insert into index needed
+    //printf("make new node to insert\n");
     Node *newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = blockAddress;
+    newNode->data = blockAddress[0];
     newNode->next = NULL;
     newNode->previous = NULL;
     // move to front
-    moveToFront(newNode, MAIN_CACHE[0]->sets[blockAddress.index]);
-
+    placeNewNode(newNode, 0, blockAddress[0].index);
     //increase size
-    MAIN_CACHE[0]->sets[blockAddress.index].size += 1;
-    //print current set
-    Node *ptr = MAIN_CACHE[0]->sets[blockAddress.index].head;
-    while(ptr != NULL){
-        printf("tag: %x, index: %d\n", ptr->data.tag, ptr->data.index);
-        ptr = ptr->next;
-    }
-    // printf("\n");
-    
+    MAIN_CACHE[0]->sets[blockAddress[0].index].size += 1;  
 
     // evict LRU node
-    if(MAIN_CACHE[0]->sets[blockAddress.index].head != NULL){
-        if(MAIN_CACHE[0]->sets[blockAddress.index].size > MAIN_CACHE[0]->sets[blockAddress.index].capacity){
-            printf("in if tag\n");
+    if(MAIN_CACHE[0]->sets[blockAddress[0].index].head != NULL){
+        //printCache();
+        if(MAIN_CACHE[0]->sets[blockAddress[0].index].size > MAIN_CACHE[0]->sets[blockAddress[0].index].capacity){
 
-            Node *deleteNode = MAIN_CACHE[0]->sets[blockAddress.index].tail;
-            // printf("1\n");
+            Node *deleteNode = MAIN_CACHE[0]->sets[blockAddress[0].index].tail;
             deleteNode->previous->next = NULL;
-            // printf("2\n");
-            MAIN_CACHE[0]->sets[blockAddress.index].tail = deleteNode->previous;
-            // printf("3\n");
+            MAIN_CACHE[0]->sets[blockAddress[0].index].tail = deleteNode->previous;
             free(deleteNode);
-            // printf("4\n");
-
-            MAIN_CACHE[0]->sets[blockAddress.index].size -= 1;
-            // printf("5\n");
+            MAIN_CACHE[0]->sets[blockAddress[0].index].size -= 1;
         }   
     }
-    // printf("end of tag\n");
-
-    return 0;
 }
 
-Block createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets){
-        // check if read or write
-    int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
-    int blockOffset = log2(BLOCK_SIZE);
-    int indexBits = log2(MAIN_CACHE[0]->numSets);
-
-    //produce mask to extract the offset bits
-    int offset = address & ((1 << blockOffset)-1);
-    //remove offset bits value from address but keep length
-    address = address ^ offset;
-    // printf("Read:  %llx\n", address);
-
-    // shift address by offset and & with mask to get index
-    int index = (address >> (blockOffset)) & ((1 << indexBits)-1);
-    // printf("index: %x\n", index);
-
-    //extract tag bits by shifting
-    unsigned long long int tag = address >> tagBits;
-    // printf("tag: %llx\n", tag);
-    // initialize 
-    Block block = {0, 0, 0, 0, 0};
-
-    // if not read
-    if(operation != 0){
-        block.dirtyBit = 1;
-    }else{
-        block.dirtyBit = 0;
-    }
-    block.index = index;
-    block.validBit = 1;
-    block.offset = offset;
-    block.tag = tag;
+Block *createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets){
     
+    Block *block = (Block*)malloc(sizeof(Block)); 
+    for (int i = 0; i < TOTAL_LEVELS; i++){
+            int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
+        int blockOffset = log2(BLOCK_SIZE);
+        int indexBits = log2(MAIN_CACHE[0]->numSets);
+        //produce mask to extract the offset bits
+        int offset = address & ((1 << blockOffset)-1);
+        //remove offset bits value from address but keep length
+        address = address ^ offset;
+        // shift address by offset and & with mask to get index
+        int index = (address >> (blockOffset)) & ((1 << indexBits)-1);
+
+        //extract tag bits by shifting
+        unsigned long long int tag = address >> tagBits;
+        // initialize 
+        Block block = {0, 0, 0, 0, 0};
+
+        // if not read
+        if(operation != 0){
+            block.dirtyBit = 1;
+        }else{
+            block.dirtyBit = 0;
+        }
+        block.index = index;
+        block.validBit = 1;
+        block.offset = offset;
+        block.tag = tag;
+
+    }
+
     return block;
 }
 
@@ -520,47 +526,37 @@ void printInfo() {
     printf("trace_file:\t\t%s\n", TRACE_FILE_NAME);
 
     printf("----------------------------------------\n");
+
+}
+
+void printSet(int setNum, int level) {
+    Node *current = MAIN_CACHE[level]->sets[setNum].head;
+    while (current != NULL)
+    {
+        printf("Tag: %x, Index: %i ->", current->data.tag, current->data.index);
+        current = current->next;
+    }
+    printf("\n");
 }
 
 void printCache() {
     // print the main cache to check if it works
-    int num_of_cache_levels = 2;
-    // Node *ptr;
-    // for (int i = 0; i < num_of_cache_levels; i++)
-    // {
-    //     printf("===== L%d contents =====\n", i + 1);
-    //     for(int j = 0; j < MAIN_CACHE[i]->numSets; j++){
-    //         printf("Set %d: ", j);
-    //         while(ptr->next != NULL){
-    //             printf("%x %c", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
-    //         }
-    //     }
-    // }
     // print out blocks in each set and cache
-    for (int i = 0; i < num_of_cache_levels; i++)
+    printf("wow %i\n", TOTAL_LEVELS);
+
+    for (int i = 0; i < TOTAL_LEVELS; i++)
     {
         printf("===== L%d contents =====\n", (i + 1));
-        printf("wow %i\n", i);
-        if(MAIN_CACHE[i]->numSets){
-            printf("%i \n", MAIN_CACHE[i]->numSets);
-        }
-                printf("wow %i\n", i);
-
-        printf("number of sets here %i: ", MAIN_CACHE[i]->numSets);
-
-        for (int j = 0; j < MAIN_CACHE[i]->numSets; j++)
-        {
-            printf("Set %d: ", j);
-            Node *ptr = MAIN_CACHE[i]->sets[j].head;
-            printf("data here is %x\n", ptr->data.tag);
-
-
-            while (ptr != NULL)
-            {
-                printf("%x %c ", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
-                ptr = ptr->next;
+        for (int j = 0; j < MAIN_CACHE[i]->numSets; j++){
+            if(MAIN_CACHE[i]->sets[j].head != NULL){
+                printf("Set %4i: ", j);
+                Node *ptr = MAIN_CACHE[i]->sets[j].head;
+                while(ptr != NULL){
+                    printf("%4x %2c ", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
+                    ptr = ptr->next;
+                }
+                printf("\n");
             }
-            printf("\n");
-        }
+        }        
     }
 }
