@@ -364,16 +364,18 @@ module cache_engine(
                         end     
                         // Pop out FIFO hit tag out of cache before shifting
                         
-                        if(L2_cache[L2_index][0] != 0)
+                        if(L2_cache[L2_index][L2_ASSOC-1] != 0)begin
                             L2_cache[L2_index][0] <= 32'b0;
-                            
-                        // Shifts through the current set with the size of the cache line to shift in FIFO order
-                        for(i = L2_ASSOC; i > 0; i = i - 1)begin
-                            L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                                                            
+                            // Shifts through the current set with the size of the cache line to shift in FIFO order
+                            for(i = L2_ASSOC; i > 0; i = i - 1)begin
+                                L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
+                            end
+                                
+                            // Insert new address at beginning of cache line
+                            L2_cache[L2_index][0] <= L2_tag;
                         end
-                            
-                        // Insert new address at beginning of cache line
-                        L2_cache[L2_index][0] <= L2_tag;
+
                         
                         if(inclusion_policy == 2)begin
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
