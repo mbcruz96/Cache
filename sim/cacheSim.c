@@ -47,10 +47,11 @@ int checkCacheAssoc(char *input, int assoc);
 int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
-void checkTagLRU(int operation, Block *blockAddress);
+void LRUPolicy(Node *temp, int currentLevel, int currentSet);
 Block *createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 void printSet(int setIndex, int cacheLevel);
+void checkTag(int operation, Block *blockAddress);
 void printInfo();
 void printCache();
 
@@ -71,6 +72,16 @@ char *TRACE_FILE_NAME = NULL;
 FILE *INPUT_FILE = NULL;
 
 CacheLevel **MAIN_CACHE = NULL;
+
+int reads[2];
+int readMisses[2];
+int writes[2];
+int writeMisses[2];
+int writeBacks[2];
+int writeThroughs[2];
+int cacheToCacheTransfers[2];
+//evictions
+int memoryTraffic;
 
 int main(int argc, char *argv[])
 {
@@ -95,7 +106,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    char operation[2];
+    char operation;
     int opIntRep = 0;
     unsigned long long int address = 0;
     int numCacheSets[2];
@@ -134,24 +145,31 @@ int main(int argc, char *argv[])
     printInfo();
     // read file for debugging
     while (!feof(INPUT_FILE)) {
-        fscanf(INPUT_FILE, " %s %llx", operation, &address);
+        fscanf(INPUT_FILE, " %c %llx", &operation, &address);
         //printf("read: %s %llx\n", operation, address);
 
-        if(strcmp(operation, "r")){
+        // if(strcmp(operation, "r")){
+        //     printf("its read\n");
+        //     opIntRep = 0;
+        // }
+        // else if(strcmp(operation, "w")){
+        //     opIntRep = 1;
+        // }
+        // else if(strcmp(operation, "wb")){
+        //     opIntRep = 2;
+        // }
+        // else if(strcmp(operation, "wt")){
+        //     opIntRep = 3;
+        // }
+        if(operation =='r'){
             opIntRep = 0;
         }
-        else if(strcmp(operation, "w")){
+        else if(operation =='w'){
             opIntRep = 1;
         }
-        else if(strcmp(operation, "wb")){
-            opIntRep = 2;
-        }
-        else if(strcmp(operation, "wt")){
-            opIntRep = 3;
-        }
         Block *blockAddress = createMemoryAddress(opIntRep, address, numCacheSets);
-        checkTagLRU(opIntRep, blockAddress);
-
+        checkTag(opIntRep, blockAddress);
+        free(blockAddress);
 
     }
     
@@ -331,7 +349,7 @@ int checkTraceFile(char *input) {
     return 0;
 }
 
-void placeNewNode(Node *temp, int currentLevel, int currentSet){
+void placeAtFront(Node *temp, int currentLevel, int currentSet){
     // if list is empty
     if(MAIN_CACHE[currentLevel]->sets[currentSet].head == NULL){
         MAIN_CACHE[currentLevel]->sets[currentSet].head = temp;
@@ -353,7 +371,7 @@ void placeNewNode(Node *temp, int currentLevel, int currentSet){
 
 }
 
-void moveToFront(Node *temp, int currentLevel, int currentSet){
+void LRUPolicy(Node *temp, int currentLevel, int currentSet){
 
     Node *current = MAIN_CACHE[currentLevel]->sets[currentSet].head;
     while (current != NULL)
@@ -390,50 +408,87 @@ void moveToFront(Node *temp, int currentLevel, int currentSet){
     return;
 }
 
-void checkTagLRU(int operation, Block *blockAddress){
+void evictBlock(int currentLevel, int index){
+
+    Node *deleteNode = MAIN_CACHE[currentLevel]->sets[index].tail;
+    deleteNode->previous->next = NULL;
+    MAIN_CACHE[currentLevel]->sets[index].tail = deleteNode->previous;
+    free(deleteNode);
+    MAIN_CACHE[currentLevel]->sets[index].size -= 1;
+    // update access traffic to memory
+    memoryTraffic += 1;
+
+}
+
+void checkTag(int operation, Block *blockAddress){
+    int found = 0;
     
     // check each cache level
     for (int currentLevel = 0; currentLevel < TOTAL_LEVELS; currentLevel++){
+
         //check each set
         Node *ptr = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
         while(ptr != NULL){
+            //if found in cache
             
             if(ptr->data.tag == blockAddress[currentLevel].tag){
+                found = 1;
+                //update dirty bit
+                // if write op
+                if(operation != 0){
+                    ptr->data.dirtyBit = 1;
+                }
+                //if read op and was already dirty
+                else if(ptr->data.dirtyBit == 1){
+                    ptr->data.dirtyBit = 1;
+                }else{
+                    ptr->data.dirtyBit = 0;
+                }
                 //if writethrough or writeback
 
                 //if not head
                 if(ptr->previous != NULL){
                     //move to head
-                    moveToFront(ptr, currentLevel, blockAddress[currentLevel].index);
+                    LRUPolicy(ptr, currentLevel, blockAddress[currentLevel].index);
                 }
-                return;
             }
             ptr = ptr->next;
         }
-    }
+        //if not in cache
+        if (found == 0){
+            // insert into index needed
+            // update access traffic to memory
+            memoryTraffic += 1;
+            //if write
+            if (operation == 1){
+                memoryTraffic += 1;
+            }
 
-    //insert into index needed
-    //printf("make new node to insert\n");
-    Node *newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = blockAddress[0];
-    newNode->next = NULL;
-    newNode->previous = NULL;
-    // move to front
-    placeNewNode(newNode, 0, blockAddress[0].index);
-    //increase size
-    MAIN_CACHE[0]->sets[blockAddress[0].index].size += 1;  
+            Node *newNode = (Node*)malloc(sizeof(Node));
+            newNode->data = blockAddress[currentLevel];
+            newNode->data.dirtyBit = blockAddress[currentLevel].dirtyBit;
+            
+            newNode->next = NULL;
+            newNode->previous = NULL;
+            if(operation == 1){
+                newNode->data.dirtyBit = 1;
+            }
+            // move to front
+            placeAtFront(newNode, currentLevel, blockAddress[currentLevel].index);
+            //increase size
+            MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size += 1;  
 
-    // evict LRU node
-    if(MAIN_CACHE[0]->sets[blockAddress[0].index].head != NULL){
-        //printCache();
-        if(MAIN_CACHE[0]->sets[blockAddress[0].index].size > MAIN_CACHE[0]->sets[blockAddress[0].index].capacity){
+            if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head != NULL){
+                //printCache();
+                if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
+                    // evict LRU node
+                    evictBlock(currentLevel, blockAddress[currentLevel].index);
+                }
+            }
 
-            Node *deleteNode = MAIN_CACHE[0]->sets[blockAddress[0].index].tail;
-            deleteNode->previous->next = NULL;
-            MAIN_CACHE[0]->sets[blockAddress[0].index].tail = deleteNode->previous;
-            free(deleteNode);
-            MAIN_CACHE[0]->sets[blockAddress[0].index].size -= 1;
-        }   
+            // update access traffic to memory
+            memoryTraffic += 1;
+        }
     }
 }
 
@@ -441,7 +496,7 @@ Block *createMemoryAddress(int operation, unsigned long long int address, int* n
     
     Block *block = (Block*)malloc(sizeof(Block)); 
     for (int i = 0; i < TOTAL_LEVELS; i++){
-            int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
+        int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
         int blockOffset = log2(BLOCK_SIZE);
         int indexBits = log2(MAIN_CACHE[0]->numSets);
         //produce mask to extract the offset bits
@@ -454,21 +509,17 @@ Block *createMemoryAddress(int operation, unsigned long long int address, int* n
         //extract tag bits by shifting
         unsigned long long int tag = address >> tagBits;
         // initialize 
-        Block block = {0, 0, 0, 0, 0};
-
         // if not read
-        if(operation != 0){
-            block.dirtyBit = 1;
-        }else{
-            block.dirtyBit = 0;
+        block[i].index = index;
+        block[i].validBit = 1;
+        block[i].offset = offset;
+        block[i].tag = tag;
+        if (operation == 1){
+            block[i].dirtyBit = 1;
+        }else {
+            block[i].dirtyBit = 0;
         }
-        block.index = index;
-        block.validBit = 1;
-        block.offset = offset;
-        block.tag = tag;
-
     }
-
     return block;
 }
 
