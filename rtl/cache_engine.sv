@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`include "cache_params.vh"
 //////////////////////////////////////////////////////////////////////////////////
 // Company: UCF
 // Engineers: John Gierlach & Harrison Lipton
@@ -19,17 +20,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-parameter BLOCKSIZE = 64;
-
-//L1 Cache properties
-parameter L1_CACHESIZE = 2048;
-parameter L1_ASSOC = 4;
-parameter L1_NUMSETS = L1_CACHESIZE/(BLOCKSIZE * L1_ASSOC);
-
-//L2 Cache properties
-parameter L2_CACHESIZE = 8192;
-parameter L2_ASSOC = 8;
-parameter L2_NUMSETS = L2_CACHESIZE/(BLOCKSIZE * L2_ASSOC);
 module cache_engine(
       input clk,
       input reset,
@@ -38,12 +28,11 @@ module cache_engine(
       input[1:0] inclusion_policy,
       input[47:0] cache_addr,
       input[7:0] cache_op,
-      output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
-      output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes,
-      output reg[31:0] L1_index, L2_index,
-      output reg[31:0] L1_tag, L2_tag,
       output reg[31:0] curr_tag,
       output reg[11:0] curr_set,
+      output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
+      output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes,
+      output reg[31:0] L1_tag, L1_index, L2_tag, L2_index,
       output reg[31:0] L1_cache [0:L1_NUMSETS-1][0:L1_ASSOC-1],
       output reg[31:0] L2_cache [0:L2_NUMSETS-1][0:L2_ASSOC-1]
     );
@@ -362,20 +351,6 @@ module cache_engine(
                         if(write_policy == 1 && cache_op == 7'h57)begin
                             L1_writes <= L1_writes + 1;
                         end     
-                        // Pop out FIFO hit tag out of cache before shifting
-                        
-                        if(L2_cache[L2_index][L2_ASSOC-1] != 0)begin
-                            L2_cache[L2_index][0] <= 32'b0;
-                                                            
-                            // Shifts through the current set with the size of the cache line to shift in FIFO order
-                            for(i = L2_ASSOC; i > 0; i = i - 1)begin
-                                L2_cache[L2_index][i] <= L2_cache[L2_index][i-1];
-                            end
-                                
-                            // Insert new address at beginning of cache line
-                            L2_cache[L2_index][0] <= L2_tag;
-                        end
-
                         
                         if(inclusion_policy == 2)begin
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
@@ -420,4 +395,5 @@ module cache_engine(
         end
     end
   end
+  
 endmodule
