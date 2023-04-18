@@ -47,9 +47,12 @@ int checkCacheAssoc(char *input, int assoc);
 int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
+void evictBlock(int currentLevel, int index);
 void LRUPolicy(Node *temp, int currentLevel, int currentSet);
-Block *createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets);
+void inclusion(int currentLevel, int operation, Block *blockAddress);
+Block *createMemoryAddress(int operation, unsigned long long int address, int* NUM_CACHE_SETS);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
+
 void printSet(int setIndex, int cacheLevel);
 void checkTag(int operation, Block *blockAddress);
 void printInfo();
@@ -64,7 +67,7 @@ int L2_CACHE_SIZE = -1;
 int L2_ASSOCIATIVITY = -1;
 
 int REPLACEMENT_POLICY = -1;
-char *INCLUSION_PROPERTY = NULL;
+int INCLUSION_PROPERTY = -1;
 
 int TOTAL_LEVELS = 0;
 
@@ -72,6 +75,8 @@ char *TRACE_FILE_NAME = NULL;
 FILE *INPUT_FILE = NULL;
 
 CacheLevel **MAIN_CACHE = NULL;
+// hold number of cache sets for L1 and L2 just at index 0 and 1
+int NUM_CACHE_SETS[2];
 
 int reads[2];
 int readMisses[2];
@@ -79,6 +84,7 @@ int writes[2];
 int writeMisses[2];
 int writeBacks[2];
 int writeThroughs[2];
+double missRate[2];
 int cacheToCacheTransfers[2];
 //evictions
 int memoryTraffic;
@@ -111,28 +117,26 @@ int main(int argc, char *argv[])
     // hold operation as int, 0 for read, 1 for write
     int opIntRep = 0;
     unsigned long long int address = 0;
-    // hold number of cache sets for L1 and L2 just at index 0 and 1
-    int numCacheSets[2];
 
     // avoid divide by zero error if associativity is 0
-    numCacheSets[0] = L1_ASSOCIATIVITY <= 0 ? 0 : L1_CACHE_SIZE / (L1_ASSOCIATIVITY * BLOCK_SIZE);
+    NUM_CACHE_SETS[0] = L1_ASSOCIATIVITY <= 0 ? 0 : L1_CACHE_SIZE / (L1_ASSOCIATIVITY * BLOCK_SIZE);
 
-    if (!isPowerOfTwo(numCacheSets[0]))
+    if (!isPowerOfTwo(NUM_CACHE_SETS[0]))
     {
         printf("L1 sets is not a power of 2, please re check values\n");
         return 1;
     }
 
     // avoid divide by zero error if associativity is 0
-    numCacheSets[1] = L2_ASSOCIATIVITY <= 0 ? 0 : L2_CACHE_SIZE / (L2_ASSOCIATIVITY * BLOCK_SIZE);
+    NUM_CACHE_SETS[1] = L2_ASSOCIATIVITY <= 0 ? 0 : L2_CACHE_SIZE / (L2_ASSOCIATIVITY * BLOCK_SIZE);
 
-    if(numCacheSets[1] > 0 && numCacheSets[0] > 0){
+    if(NUM_CACHE_SETS[1] > 0 && NUM_CACHE_SETS[0] > 0){
         TOTAL_LEVELS = 2;
     }else{
         TOTAL_LEVELS = 1;
     }
 
-    if (!isPowerOfTwo(numCacheSets[1]))
+    if (!isPowerOfTwo(NUM_CACHE_SETS[1]))
     {
         printf("L2 sets is not a power of 2, please re check values\n");
         return 1;
@@ -142,8 +146,8 @@ int main(int argc, char *argv[])
     int num_of_cache_levels = 2;
     MAIN_CACHE = malloc(num_of_cache_levels * sizeof(CacheLevel *));
 
-    MAIN_CACHE[0] = createCacheLevel(1, L1_CACHE_SIZE, L1_ASSOCIATIVITY, numCacheSets[0]);
-    MAIN_CACHE[1] = createCacheLevel(2, L2_CACHE_SIZE, L2_ASSOCIATIVITY, numCacheSets[1]);
+    MAIN_CACHE[0] = createCacheLevel(1, L1_CACHE_SIZE, L1_ASSOCIATIVITY, NUM_CACHE_SETS[0]);
+    MAIN_CACHE[1] = createCacheLevel(2, L2_CACHE_SIZE, L2_ASSOCIATIVITY, NUM_CACHE_SETS[1]);
 
     printInfo();
     // read file for debugging
@@ -151,38 +155,36 @@ int main(int argc, char *argv[])
         fscanf(INPUT_FILE, " %c %llx", &operation, &address);
         //printf("read: %s %llx\n", operation, address);
 
-        // if(strcmp(operation, "r")){
-        //     printf("its read\n");
-        //     opIntRep = 0;
-        // }
-        // else if(strcmp(operation, "w")){
-        //     opIntRep = 1;
-        // }
-        // else if(strcmp(operation, "wb")){
-        //     opIntRep = 2;
-        // }
-        // else if(strcmp(operation, "wt")){
-        //     opIntRep = 3;
-        // }
         if(operation =='r'){
             opIntRep = 0;
         }
         else if(operation =='w'){
             opIntRep = 1;
         }
-        Block *blockAddress = createMemoryAddress(opIntRep, address, numCacheSets);
+        Block *blockAddress = createMemoryAddress(opIntRep, address, NUM_CACHE_SETS);
         checkTag(opIntRep, blockAddress);
         // free blockAddress after use, relevent data has been copied to cache
         free(blockAddress);
 
     }
-    
+    // calculate miss rates
+    if(readMisses[0] == 0 || writeMisses[0] == 0){
+        missRate[0] = 0;
+    }else{
+        missRate[0] = (double)(readMisses[0] + writeMisses[0]) / (reads[0] + writes[0]);
+
+    }
+    if(readMisses[1] == 0 || writeMisses[1] == 0){
+        missRate[1] = 0;
+    }else{
+        missRate[1] = (double)(readMisses[1] + writeMisses[1]) / (reads[1] + writes[1]);
+    }
     printCache();
     
     // free all malloced memory
     for (int i = 0; i < 2; i++){
-        //printf("fgdfgsfgsdfg %i\n", numCacheSets[i]);
-        for (int j = 0; j < numCacheSets[i]; j++){
+        //printf("fgdfgsfgsdfg %i\n", NUM_CACHE_SETS[i]);
+        for (int j = 0; j < NUM_CACHE_SETS[i]; j++){
             //printf("freeing nodes now\n");
             Node *current = MAIN_CACHE[i]->sets[j].head;
             // as long as the set at the index was instantiated
@@ -328,9 +330,12 @@ int checkInclusionProperty(char *input) {
     }
 
     // convert input string to int
-    INCLUSION_PROPERTY = input;
-    if (strcmp(INCLUSION_PROPERTY, "inclusive") || strcmp(INCLUSION_PROPERTY, "non-inclusive"))
+    if(strcmp(input, "inclusive")){
+        INCLUSION_PROPERTY = 1;
+        return 0;
+    }else if(strcmp(input, "non-inclusive"))
     {
+        INCLUSION_PROPERTY = 0;
         return 0;
     }
     printf(">>> Inclusion property must be inclusive or non-inclusive\n");
@@ -410,13 +415,47 @@ void LRUPolicy(Node *temp, int currentLevel, int currentSet){
             }
         }
         current = current->next;
-    }    
-
+    }  
     return;
 }
 
-void evictBlock(int currentLevel, int index){
+void inclusion(int currentLevel, int operation, Block *blockAddress){
+    Node *newNode = (Node*)malloc(sizeof(Node));
+    //printf("about to add block: \n");
+    newNode->data = blockAddress[currentLevel];
+    // newNode->data.dirtyBit = blockAddress[currentLevel].dirtyBit;
+    newNode->next = NULL;
+    newNode->previous = NULL;
+    // if(operation == 1){
+    //     newNode->data.dirtyBit = 1;
+    // }
+    // move to front
+    if(newNode->data.tag == 0x8006b){
+        printSet(blockAddress[currentLevel].index, currentLevel);
+    }
+    
+    placeAtFront(newNode, currentLevel, blockAddress[currentLevel].index);
 
+    if(newNode->data.tag == 0x8006b){
+        printSet(blockAddress[currentLevel].index, currentLevel);
+    }
+
+    //increase size
+    MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size += 1; 
+    // if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head != NULL){
+    //printCache();
+    // if our set is to large we know we need to evict
+    if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
+        // evict LRU node
+        evictBlock(currentLevel, blockAddress[currentLevel].index);
+    }
+    // }
+
+    // update access traffic to memory
+    // memoryTraffic += 1;
+}
+
+void evictBlock(int currentLevel, int index){
     Node *deleteNode = MAIN_CACHE[currentLevel]->sets[index].tail;
     deleteNode->previous->next = NULL;
     MAIN_CACHE[currentLevel]->sets[index].tail = deleteNode->previous;
@@ -424,15 +463,23 @@ void evictBlock(int currentLevel, int index){
     // update access traffic to memory
     if (deleteNode->data.dirtyBit == 1) {
         memoryTraffic += 1;
+        writeBacks[currentLevel] += 1;
     }
     free(deleteNode);
 }
 
 void checkTag(int operation, Block *blockAddress){
     int found = 0;
-    
     // check each cache level
     for (int currentLevel = 0; currentLevel < TOTAL_LEVELS; currentLevel++){
+        //update read or write count
+
+        if(operation == 0){
+            reads[currentLevel] += 1;
+        }
+        else{
+            writes[currentLevel] += 1;
+        }
 
         // ptr being the head of the set in the cache
         Node *ptr = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
@@ -446,15 +493,7 @@ void checkTag(int operation, Block *blockAddress){
                 if(operation == 1){
                     ptr->data.dirtyBit = 1;
                 }
-                //if read op and was already dirty
-                // else if(ptr->data.dirtyBit == 1){
-                //     ptr->data.dirtyBit = 1;
-                // }
-                // else{
-                //     ptr->data.dirtyBit = 0;
-                // }
                 //if writethrough or writeback
-
                 //if not head
                 if(ptr->previous != NULL){
                     //move to head
@@ -465,46 +504,30 @@ void checkTag(int operation, Block *blockAddress){
         }
         //if not in cache
         if (found == 0){
-            // insert into index needed
+            //update miss count
+            if(NUM_CACHE_SETS[currentLevel] == 0){
+                continue;
+            }
+            if(operation == 0){
+                readMisses[currentLevel] += 1;
+            }
+            else{
+                writeMisses[currentLevel] += 1;
+            }
+            inclusion(currentLevel, operation, blockAddress);
             // update access traffic to memory
             memoryTraffic += 1;
-
-            Node *newNode = (Node*)malloc(sizeof(Node));
-            newNode->data = blockAddress[currentLevel];
-            // newNode->data.dirtyBit = blockAddress[currentLevel].dirtyBit;
-            
-            newNode->next = NULL;
-            newNode->previous = NULL;
-            if(operation == 1){
-                newNode->data.dirtyBit = 1;
-            }
-            // move to front
-            placeAtFront(newNode, currentLevel, blockAddress[currentLevel].index);
-            //increase size
-            MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size += 1;  
-
-            // if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head != NULL){
-            //printCache();
-            // if our set is to large we know we need to evict
-            if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
-                // evict LRU node
-                evictBlock(currentLevel, blockAddress[currentLevel].index);
-            }
-            // }
-
-            // update access traffic to memory
-            // memoryTraffic += 1;
         }
     }
 }
 
-Block *createMemoryAddress(int operation, unsigned long long int address, int* numCacheSets){
+Block *createMemoryAddress(int operation, unsigned long long int address, int* NUM_CACHE_SETS){
     
-    Block *block = (Block*)malloc(sizeof(Block)); 
+    Block *block = (Block*)malloc(sizeof(Block) * TOTAL_LEVELS); 
     for (int i = 0; i < TOTAL_LEVELS; i++){
-        int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[0]->numSets);
+        int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[i]->numSets);
         int blockOffset = log2(BLOCK_SIZE);
-        int indexBits = log2(MAIN_CACHE[0]->numSets);
+        int indexBits = log2(MAIN_CACHE[i]->numSets);
         //produce mask to extract the offset bits
         int offset = address & ((1 << blockOffset)-1);
         //remove offset bits value from address but keep length
@@ -538,7 +561,7 @@ CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int nu
     cache->numSets = numSets;
     
     cache->sets = (Set *)malloc(sizeof(Set) * numSets);
-    
+    printf("number of sets: %i\n\n\n", numSets);
     for (int i = 0; i < numSets; i++){
         cache->sets[i].size = 0;
         cache->sets[i].capacity = associativity;
@@ -577,12 +600,17 @@ void printInfo() {
     }
 
     // Inclusion Policy
-    printf("INCLUSION PROPERTY:\t%s\n", INCLUSION_PROPERTY);
+    if(INCLUSION_PROPERTY == 1){
+        printf("INCLUSION PROPERTY:\tinclusive\n");
+    }
+    else{
+        printf("INCLUSION PROPERTY:\tnon-inclusive\n");
+    }
     
     // Trace File
     printf("trace_file:\t\t%s\n", TRACE_FILE_NAME);
 
-    printf("----------------------------------------\n");
+    // printf("----------------------------------------\n");
 
 }
 
@@ -590,7 +618,7 @@ void printSet(int setNum, int level) {
     Node *current = MAIN_CACHE[level]->sets[setNum].head;
     while (current != NULL)
     {
-        printf("Tag: %x, Index: %i ->", current->data.tag, current->data.index);
+        printf("Tag: %x, Index: %i dirty? %i -> ", current->data.tag, current->data.index, current->data.dirtyBit);
         current = current->next;
     }
     printf("\n");
@@ -608,11 +636,28 @@ void printCache() {
                 printf("Set %4i: ", j);
                 Node *ptr = MAIN_CACHE[i]->sets[j].head;
                 while(ptr != NULL){
-                    printf("%4x %2c ", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
+                    printf("%7x %c ", ptr->data.tag, ptr->data.dirtyBit == 1 ? 'D' : ' ');
                     ptr = ptr->next;
                 }
                 printf("\n");
             }
-        }        
+        }
     }
+    printf("===== Simulation results (raw) =====\n");
+    printf("a. number of L1 reads:        %i\n", reads[0]);
+    printf("b. number of L1 read misses:  %i\n", readMisses[0]);
+    printf("c. number of L1 writes:       %i\n", writes[0]);
+    printf("d. number of L1 write misses: %i\n", writeMisses[0]);
+    printf("e. L1 miss rate:              %f\n", missRate[0]);
+    printf("f. number of L1 writebacks:   %i\n", writeBacks[0]);
+    printf("g. number of L2 reads:        %i\n", reads[1]);
+    printf("h. number of L2 read misses:  %i\n", readMisses[1]);
+    printf("i. number of L2 writes:       %i\n", writeMisses[1]);
+    printf("j. number of L2 write misses: %i\n", writeMisses[1]);
+    printf("k. L2 miss rate:              %f\n", missRate[1]);
+    printf("l. number of L2 writebacks:   %i\n", writeBacks[1]);
+    printf("m. total memory traffic:      %i\n", memoryTraffic);    
+    printf("number of sets: %i\n", NUM_CACHE_SETS[0]);
+    printf("number of sets: %i\n", NUM_CACHE_SETS[1]);
+
 }
