@@ -47,7 +47,7 @@ int checkCacheAssoc(char *input, int assoc);
 int checkReplacementPolicy(char *input);
 int checkInclusionProperty(char *input);
 int checkTraceFile(char *input);
-void evictBlock(int currentLevel, int index);
+void evictBlock(int currentLevel, Block *blockAddress);
 void LRUPolicy(Node *temp, int currentLevel, int currentSet);
 void inclusion(int currentLevel, int operation, Block *blockAddress);
 Block *createMemoryAddress(int operation, unsigned long long int address, int* NUM_CACHE_SETS);
@@ -111,7 +111,8 @@ int main(int argc, char *argv[])
     {
         return 1;
     }
-
+    printf("%s\n", argv[6]);
+    printf("%s\n", argv[7]);
     // hold read or write operation
     char operation;
     // hold operation as int, 0 for read, 1 for write
@@ -152,8 +153,12 @@ int main(int argc, char *argv[])
     printInfo();
     // read file for debugging
     while (!feof(INPUT_FILE)) {
-        fscanf(INPUT_FILE, " %c %llx", &operation, &address);
-        //printf("read: %s %llx\n", operation, address);
+        int read = fscanf(INPUT_FILE, " %c %llx", &operation, &address);
+        printf("read: %i %llx\n", operation, address);
+        if(read == EOF){
+            break;
+        }
+        printf("still read: %i %llx\n", operation, address);
 
         if(operation =='r'){
             opIntRep = 0;
@@ -303,19 +308,19 @@ int checkReplacementPolicy(char *input) {
     }
 
     // convert input string to int
-    if (strcmp(input, "LRU"))
+    if (strcmp(input, "LRU") == 0)
     {
         REPLACEMENT_POLICY = 1;
         return 0;
     }
-    if (strcmp(input, "FIFO"))
+    if (strcmp(input, "FIFO") == 0)
     {
         REPLACEMENT_POLICY = 2;
         return 0;
     }
-    if (strcmp(input, "OPTIMAL"))
+    if (strcmp(input, "OPTIMAL") == 0)
     {
-        REPLACEMENT_POLICY = 2;
+        REPLACEMENT_POLICY = 3;
         return 0;
     }
     printf(">>> Replacement policy must be LRU, FIFO, or OPTIMAL\n");
@@ -329,13 +334,21 @@ int checkInclusionProperty(char *input) {
         return -1;
     }
 
-    // convert input string to int
-    if(strcmp(input, "inclusive")){
-        INCLUSION_PROPERTY = 1;
-        return 0;
-    }else if(strcmp(input, "non-inclusive"))
-    {
+    // replace - with space to use strcmp
+    input[3] = ' ';
+
+    if(strcmp(input, "non inclusive") == 0){
         INCLUSION_PROPERTY = 0;
+        printf("im in non inclusive\n");
+        printf("%s\n", input);
+        printf("%i\n", INCLUSION_PROPERTY);
+        return 0;
+    }else
+    {
+        INCLUSION_PROPERTY = 1;
+        printf("%s\n", input);
+        printf("%i\n", INCLUSION_PROPERTY);
+
         return 0;
     }
     printf(">>> Inclusion property must be inclusive or non-inclusive\n");
@@ -421,50 +434,50 @@ void LRUPolicy(Node *temp, int currentLevel, int currentSet){
 
 void inclusion(int currentLevel, int operation, Block *blockAddress){
     Node *newNode = (Node*)malloc(sizeof(Node));
-    //printf("about to add block: \n");
+
     newNode->data = blockAddress[currentLevel];
-    // newNode->data.dirtyBit = blockAddress[currentLevel].dirtyBit;
+
     newNode->next = NULL;
     newNode->previous = NULL;
-    // if(operation == 1){
-    //     newNode->data.dirtyBit = 1;
-    // }
-    // move to front
-    if(newNode->data.tag == 0x8006b){
-        printSet(blockAddress[currentLevel].index, currentLevel);
+    // if the current tag is 0x80039 and index is 126, print that info
+    if (blockAddress[currentLevel].tag == 0x80039 && blockAddress[currentLevel].index == 126) {
+        printf("%x, index %i\n", blockAddress[currentLevel].tag , blockAddress[currentLevel].index);
     }
-    
+
     placeAtFront(newNode, currentLevel, blockAddress[currentLevel].index);
-
-    if(newNode->data.tag == 0x8006b){
-        printSet(blockAddress[currentLevel].index, currentLevel);
-    }
-
     //increase size
     MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size += 1; 
-    // if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head != NULL){
-    //printCache();
     // if our set is to large we know we need to evict
+    if (blockAddress[currentLevel].tag == 0x80039 && blockAddress[currentLevel].index == 126) {
+        printf("%x, index %i\n", blockAddress[currentLevel].tag , blockAddress[currentLevel].index);
+    }
+
     if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
         // evict LRU node
-        evictBlock(currentLevel, blockAddress[currentLevel].index);
+        if (blockAddress[currentLevel].tag == 0x80039 && blockAddress[currentLevel].index == 126) {
+            printf("%x, index %i\n", blockAddress[currentLevel].tag , blockAddress[currentLevel].index);
+        }
+        evictBlock(currentLevel, blockAddress);
     }
-    // }
-
-    // update access traffic to memory
-    // memoryTraffic += 1;
 }
 
-void evictBlock(int currentLevel, int index){
-    Node *deleteNode = MAIN_CACHE[currentLevel]->sets[index].tail;
+void evictBlock(int currentLevel, Block *blockAddress){
+    Node *deleteNode = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].tail;
     deleteNode->previous->next = NULL;
-    MAIN_CACHE[currentLevel]->sets[index].tail = deleteNode->previous;
-    MAIN_CACHE[currentLevel]->sets[index].size -= 1;
+    MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].tail = deleteNode->previous;
+    MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size -= 1;
     // update access traffic to memory
     if (deleteNode->data.dirtyBit == 1) {
         memoryTraffic += 1;
         writeBacks[currentLevel] += 1;
     }
+    // if we are not at the bottom level
+    if(currentLevel < 1){
+        inclusion(currentLevel + 1, deleteNode->data.dirtyBit, blockAddress);
+    }
+    
+    printf("evicting: %x, %i\n", deleteNode->data.tag , deleteNode->data.index);
+
     free(deleteNode);
 }
 
@@ -472,28 +485,28 @@ void checkTag(int operation, Block *blockAddress){
     int found = 0;
     // check each cache level
     for (int currentLevel = 0; currentLevel < TOTAL_LEVELS; currentLevel++){
-        //update read or write count
-
-        if(operation == 0){
-            reads[currentLevel] += 1;
-        }
-        else{
-            writes[currentLevel] += 1;
-        }
 
         // ptr being the head of the set in the cache
         Node *ptr = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
+        if(found == 1 && operation == 1){
+            operation = 0;
+            found = 0;
+        }
         while(ptr != NULL){
             //if found in cache
-            
+            // if not found before in a previous level
             if(ptr->data.tag == blockAddress[currentLevel].tag){
-                found = 1;
-                //update dirty bit
-                // if write op
-                if(operation == 1){
+                // update read or write count
+                if(operation == 0){
+                    reads[currentLevel] += 1;
+                }
+                else{
+                    writes[currentLevel] += 1;
+                    // if write op
                     ptr->data.dirtyBit = 1;
                 }
-                //if writethrough or writeback
+                //mark as found
+                found = 1;
                 //if not head
                 if(ptr->previous != NULL){
                     //move to head
@@ -561,7 +574,6 @@ CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int nu
     cache->numSets = numSets;
     
     cache->sets = (Set *)malloc(sizeof(Set) * numSets);
-    printf("number of sets: %i\n\n\n", numSets);
     for (int i = 0; i < numSets; i++){
         cache->sets[i].size = 0;
         cache->sets[i].capacity = associativity;
@@ -600,11 +612,12 @@ void printInfo() {
     }
 
     // Inclusion Policy
-    if(INCLUSION_PROPERTY == 1){
-        printf("INCLUSION PROPERTY:\tinclusive\n");
+    printf("%i\n", INCLUSION_PROPERTY);
+    if(INCLUSION_PROPERTY == 0){
+        printf("INCLUSION PROPERTY:\tnon-inclusive\n");
     }
     else{
-        printf("INCLUSION PROPERTY:\tnon-inclusive\n");
+        printf("INCLUSION PROPERTY:\tinclusive\n");
     }
     
     // Trace File
