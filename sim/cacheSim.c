@@ -106,9 +106,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // hold read or write operation
     char operation;
+    // hold operation as int, 0 for read, 1 for write
     int opIntRep = 0;
     unsigned long long int address = 0;
+    // hold number of cache sets for L1 and L2 just at index 0 and 1
     int numCacheSets[2];
 
     // avoid divide by zero error if associativity is 0
@@ -169,20 +172,24 @@ int main(int argc, char *argv[])
         }
         Block *blockAddress = createMemoryAddress(opIntRep, address, numCacheSets);
         checkTag(opIntRep, blockAddress);
+        // free blockAddress after use, relevent data has been copied to cache
         free(blockAddress);
 
     }
     
     printCache();
+    
+    // free all malloced memory
     for (int i = 0; i < 2; i++){
         //printf("fgdfgsfgsdfg %i\n", numCacheSets[i]);
         for (int j = 0; j < numCacheSets[i]; j++){
             //printf("freeing nodes now\n");
             Node *current = MAIN_CACHE[i]->sets[j].head;
+            // as long as the set at the index was instantiated
             while (current != NULL){
-                Node *temp = current;
+                Node *freeNode = current;
                 current = current->next;
-                free(temp);
+                free(freeNode);
             }
             free(current);
         }
@@ -413,11 +420,12 @@ void evictBlock(int currentLevel, int index){
     Node *deleteNode = MAIN_CACHE[currentLevel]->sets[index].tail;
     deleteNode->previous->next = NULL;
     MAIN_CACHE[currentLevel]->sets[index].tail = deleteNode->previous;
-    free(deleteNode);
     MAIN_CACHE[currentLevel]->sets[index].size -= 1;
     // update access traffic to memory
-    memoryTraffic += 1;
-
+    if (deleteNode->data.dirtyBit == 1) {
+        memoryTraffic += 1;
+    }
+    free(deleteNode);
 }
 
 void checkTag(int operation, Block *blockAddress){
@@ -426,7 +434,7 @@ void checkTag(int operation, Block *blockAddress){
     // check each cache level
     for (int currentLevel = 0; currentLevel < TOTAL_LEVELS; currentLevel++){
 
-        //check each set
+        // ptr being the head of the set in the cache
         Node *ptr = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
         while(ptr != NULL){
             //if found in cache
@@ -435,15 +443,16 @@ void checkTag(int operation, Block *blockAddress){
                 found = 1;
                 //update dirty bit
                 // if write op
-                if(operation != 0){
+                if(operation == 1){
                     ptr->data.dirtyBit = 1;
                 }
                 //if read op and was already dirty
-                else if(ptr->data.dirtyBit == 1){
-                    ptr->data.dirtyBit = 1;
-                }else{
-                    ptr->data.dirtyBit = 0;
-                }
+                // else if(ptr->data.dirtyBit == 1){
+                //     ptr->data.dirtyBit = 1;
+                // }
+                // else{
+                //     ptr->data.dirtyBit = 0;
+                // }
                 //if writethrough or writeback
 
                 //if not head
@@ -459,14 +468,10 @@ void checkTag(int operation, Block *blockAddress){
             // insert into index needed
             // update access traffic to memory
             memoryTraffic += 1;
-            //if write
-            if (operation == 1){
-                memoryTraffic += 1;
-            }
 
             Node *newNode = (Node*)malloc(sizeof(Node));
             newNode->data = blockAddress[currentLevel];
-            newNode->data.dirtyBit = blockAddress[currentLevel].dirtyBit;
+            // newNode->data.dirtyBit = blockAddress[currentLevel].dirtyBit;
             
             newNode->next = NULL;
             newNode->previous = NULL;
@@ -478,16 +483,17 @@ void checkTag(int operation, Block *blockAddress){
             //increase size
             MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size += 1;  
 
-            if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head != NULL){
-                //printCache();
-                if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
-                    // evict LRU node
-                    evictBlock(currentLevel, blockAddress[currentLevel].index);
-                }
+            // if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head != NULL){
+            //printCache();
+            // if our set is to large we know we need to evict
+            if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
+                // evict LRU node
+                evictBlock(currentLevel, blockAddress[currentLevel].index);
             }
+            // }
 
             // update access traffic to memory
-            memoryTraffic += 1;
+            // memoryTraffic += 1;
         }
     }
 }
@@ -593,7 +599,6 @@ void printSet(int setNum, int level) {
 void printCache() {
     // print the main cache to check if it works
     // print out blocks in each set and cache
-    printf("wow %i\n", TOTAL_LEVELS);
 
     for (int i = 0; i < TOTAL_LEVELS; i++)
     {
