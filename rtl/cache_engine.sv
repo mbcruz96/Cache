@@ -39,7 +39,7 @@ module cache_engine(
     
     
   // FSM Regs and Parameters
-  parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFTFULL = 3, SHIFTEMPTY = 4, LRUHIT = 5, DONE = 6;
+  parameter IDLE = 0, READ = 1, SEARCH = 2, SHIFTFULL = 3, SHIFTEMPTY = 4, CACHEHIT = 5, DONE = 6;
   reg[3:0] state, next_state;
   reg[47:0] prev_addr;
   
@@ -62,12 +62,12 @@ module cache_engine(
         SEARCH:begin
             // FIFO
             if(replace_policy == 0)begin
-                next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0 || L2_cache[L2_index][L2_ASSOC-1]) ? SHIFTEMPTY:SHIFTFULL;
+                next_state <= (L1_found | L2_found) ? CACHEHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0 || L2_cache[L2_index][L2_ASSOC-1]) ? SHIFTEMPTY:SHIFTFULL;
             end
 
             // LRU | If cache hit, go to LRUHIT logic, if cache miss proceed with FIFO-like shifitng
             else
-                next_state <= (L1_found | L2_found) ? LRUHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0 || L2_cache[L2_index][L2_ASSOC-1]) ? SHIFTEMPTY:SHIFTFULL;
+                next_state <= (L1_found | L2_found) ? CACHEHIT:(L1_cache[L1_index][L1_ASSOC-1] != 0 || L2_cache[L2_index][L2_ASSOC-1]) ? SHIFTEMPTY:SHIFTFULL;
         end
         
         // Shift if current cache is Full FIFO or Full LRU Miss
@@ -77,7 +77,7 @@ module cache_engine(
         SHIFTEMPTY: next_state <= DONE;
         
         // Shift logic in case of LRU hit
-        LRUHIT: next_state <= DONE; 
+        CACHEHIT: next_state <= DONE; 
         
         // Finish Shift operations, calculate miss rate, and jump into ideal
         DONE: next_state <= IDLE;
@@ -207,6 +207,12 @@ module cache_engine(
                     end     
                 end
                 
+                // TODO:
+                
+                //if(replace policy is exclusive)
+                
+                //if(replace policy is inclusive)
+                
                 // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
                 if(inclusion_policy == 2)begin
                 
@@ -244,7 +250,13 @@ module cache_engine(
                         L2_writes <= L2_writes + 1;
                     end     
                 end
-   
+                
+                // TODO:
+                
+                //if(replace policy is exclusive)
+                
+                //if(replace policy is inclusive)
+                
                 // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
                 if(inclusion_policy == 2)begin
                 
@@ -266,7 +278,7 @@ module cache_engine(
         end
 
         // Shift logic for LRU hit
-        else if(next_state == LRUHIT)begin
+        else if(next_state == CACHEHIT)begin
 
                 if(replace_policy == 1)begin
                     
@@ -307,6 +319,11 @@ module cache_engine(
                         // Insert new address at beginning of cache line
                         L2_cache[L2_index][0] <= L2_tag;
                         
+                        // TODO:
+                
+                        //if(replace policy is exclusive)
+                        
+                        //if(replace policy is inclusive)
                         if(inclusion_policy == 2)begin
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
                             if(L2_index > L1_ASSOC-1)begin
@@ -350,7 +367,13 @@ module cache_engine(
                         L1_reads <= L1_reads + 1;
                         if(write_policy == 1 && cache_op == 7'h57)begin
                             L1_writes <= L1_writes + 1;
-                        end     
+                        end
+                             
+                        // TODO:
+                
+                        //if(replace policy is exclusive)
+                        
+                        //if(replace policy is inclusive)
                         
                         if(inclusion_policy == 2)begin
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set

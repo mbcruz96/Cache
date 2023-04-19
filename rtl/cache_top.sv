@@ -29,18 +29,15 @@ module cache_top(
   input[47:0] cache_addr,
   input[7:0] cache_op,
   output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
-  output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes,
-  output reg[31:0] curr_tag,
-  output reg[11:0] curr_set,
-  output reg[31:0] L1_cache [0:L1_NUMSETS-1][0:L1_ASSOC-1],
-  output reg[31:0] L2_cache [0:L2_NUMSETS-1][0:L2_ASSOC-1]
+  output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes
 );
 
   // write_policy: 0 -> write through | 1 -> write back                         DONE
   // replace_policy: 0 -> FIFO | 1 -> LRU                                       DONE
   // inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive     IN-PROGRESS
   // cache_op: W or R
-  
+  reg[31:0] L1_cache [0:L1_NUMSETS-1][0:L1_ASSOC-1];
+  reg[31:0] L2_cache [0:L2_NUMSETS-1][0:L2_ASSOC-1];
   reg[31:0] L1_index;         
   reg[31:0] L1_tag;
   

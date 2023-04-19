@@ -44,7 +44,7 @@ module cache_tb();
     real L2misses, L2reads, L2hits, L2writes;
     
     
-    cache_top UUT(
+    cache_engine UUT(
         .clk(clk), 
         .reset(reset), 
         .write_policy(write_policy), 
