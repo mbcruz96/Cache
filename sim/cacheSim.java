@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Scanner;
@@ -80,6 +81,7 @@ class CacheLevel
             {
                 updateLRU(setNumber, tag);
             }
+
             hits++;
         }
         else
@@ -395,6 +397,7 @@ class CacheSim
         }
 
         boolean L2Exists = (l2Size > 0 ? true : false);
+        System.out.println(L2Exists);
         OverallCache cache;
         if (L2Exists)
         {
@@ -409,11 +412,13 @@ class CacheSim
 
         if (L2Exists)
         {
-            while (in.hasNext())
+            // while (in.hasNext())
+            for (int i = 0; i < 20000; i++)
             {
                 String nextLine = in.nextLine();
                 char op = nextLine.charAt(0);
                 long address = Long.parseLong(nextLine.substring(2), 16);
+                address = address / cache.L1.blockSize;
                 int L1SetNumber = (int)(address % cache.L1.numSets);
                 int L2SetNumber = (int)(address % cache.L2.numSets);
                 int L1Tag = (int)(address / cache.L1.numSets);
@@ -434,13 +439,39 @@ class CacheSim
                 String nextLine = in.nextLine();
                 char op = nextLine.charAt(0);
                 long address = Long.parseLong(nextLine.substring(2), 16);
+                address = address / cache.L1.blockSize;
+                // System.out.println(String.format("0x%08X", address));
                 int L1SetNumber = (int)(address % cache.L1.numSets);
                 int L1Tag = (int)(address / cache.L1.numSets);
                 
+                // System.out.println("Address: " + String.format("0x%08X", address));
+                // System.out.println("Set Number: " + L1SetNumber);
+                // System.out.println("Tag: " + String.format("0x%08X", L1Tag));
+                // System.out.println();
+
                 //execute operation
                 cache.L1.performOperation(op, L1SetNumber, L1Tag);
                 
             }
+
+            // while(in.hasNext()) 
+            // {
+            //     // System.out.println("iteration " + counter);
+            //     String line = in.nextLine();
+            //     char op = line.charAt(0);
+            //     String temp = "0" + line.substring(4);
+            //     BigInteger bigAddress = new BigInteger(temp, 16);
+            //     bigAddress = bigAddress.divide(new BigInteger("" + cache.L1.blockSize));
+            //     //address /= cache.blockSize;
+            //     long address = bigAddress.longValue();
+            //     int setNumber = (int)(address % cache.L1.numSets);
+            //     int tag = (int)(address / cache.L1.numSets);
+
+            //     // System.out.println(setNumber);
+            //     // System.out.println(tag);
+            //     cache.L1.performOperation(op, setNumber, tag); 
+            // }
+
             cache.L1.printStats();
             // cache.L2.printStats();
         }
