@@ -471,6 +471,7 @@ void evictBlock(int currentLevel, Block *blockAddress){
         memoryTraffic += 1;
         writeBacks[currentLevel] += 1;
     }
+    
     // if we are not at the bottom level
     if(currentLevel < 1){
         inclusion(currentLevel + 1, deleteNode->data.dirtyBit, blockAddress);
@@ -481,6 +482,7 @@ void evictBlock(int currentLevel, Block *blockAddress){
     free(deleteNode);
 }
 
+//cycles levels, determines if tag we are looking for is there
 void checkTag(int operation, Block *blockAddress){
     int found = 0;
     // check each cache level
