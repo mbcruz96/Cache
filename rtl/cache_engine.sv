@@ -344,16 +344,16 @@ module cache_engine(
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
                             else begin
                                 // Pop out last address out of cache before shifting
-                                if(L1_cache[L2_index][L1_ASSOC-1] != 0)
-                                    L1_cache[L2_index][L1_ASSOC-1] <= 32'b0;
+                                if(L1_cache[L1_index][L1_ASSOC-1] != 0)
+                                    L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
                                 for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
-                                    L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
+                                    L1_cache[L1_index][i] <= L1_cache[L2_index][i-1];
                                 end
                                     
                                 // Insert tag entry from L2 into L1 Set from the L2 Set 
-                                L1_cache[L2_index][0] <= L1_tag;
+                                L1_cache[L1_index][0] <= L1_tag;
                             end 
                           
                         end
@@ -400,11 +400,11 @@ module cache_engine(
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
                                 for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
-                                    L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
+                                    L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                                 end
                                     
                                 // Insert tag entry from L2 into L1 Set from the L2 Set 
-                                L1_cache[L2_index][0] <= L1_tag;
+                                L1_cache[L1_index][0] <= L1_tag;
                             end   
                         end
                     end
