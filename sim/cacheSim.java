@@ -5,14 +5,12 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Scanner;
 
-class Block
-{
+class Block {
     int tag;
     boolean dirty;
     boolean valid;
-    
-    public Block()
-    {
+
+    public Block() {
         tag = 0;
         dirty = true;
         valid = false;
@@ -27,7 +25,7 @@ class CacheLevel
     int numSets;
     ArrayList<LinkedList<Integer>> tagArray;
     ArrayList<LinkedList<Block>> blockArray;
-    int replacementPolicy; //1 = lru, 2 = fifo, 3 = optimal
+    int replacementPolicy; // 1 = lru, 2 = fifo, 3 = optimal
     int misses;
     int hits;
     int writes;
@@ -49,8 +47,7 @@ class CacheLevel
         this.tagArray = new ArrayList<LinkedList<Integer>>();
         this.blockArray = new ArrayList<LinkedList<Block>>();
 
-        for (int i = 0; i < this.numSets; i++)
-        {
+        for (int i = 0; i < this.numSets; i++) {
             this.tagArray.add(new LinkedList<Integer>());
             this.blockArray.add(new LinkedList<Block>());
         }
@@ -130,15 +127,12 @@ class CacheLevel
         }
     }
 
-    void performRead(int setNumber, int tag)
-    {
+    void performRead(int setNumber, int tag) {
         int index = getIndexOfTag(setNumber, tag);
 
-        //the tag was found in the cache
-        if (index != -1)
-        {
-            if (replacementPolicy == 1)
-            {
+        // the tag was found in the cache
+        if (index != -1) {
+            if (replacementPolicy == 1) {
                 updateLRU(setNumber, tag);
             }
             hits++;
@@ -153,23 +147,19 @@ class CacheLevel
             newBlock.dirty = false;
             newBlock.valid = true;
 
-            //cache set is not full
-            if (tagArray.get(setNumber).size() < this.associativity)
-            {
-                //insert to both without worrying, no need to evict because there is space left
+            // cache set is not full
+            if (tagArray.get(setNumber).size() < this.associativity) {
+                // insert to both without worrying, no need to evict because there is space left
                 addToLinkedLists(setNumber, tag, newBlock);
                 return;
             }
-            
-            //cache set is full
-            //optimal replacement policy placeholder
-            if (replacementPolicy == 3)
-            {
-                //perform optimal replacement
-            }
-            else
-            {
-                //perform LRU/FIFO replacement
+
+            // cache set is full
+            // optimal replacement policy placeholder
+            if (replacementPolicy == 3) {
+                // perform optimal replacement
+            } else {
+                // perform LRU/FIFO replacement
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
                 LinkedList<Block> curSet2 = blockArray.get(setNumber);
 
@@ -191,13 +181,11 @@ class CacheLevel
         }
     }
 
-    int getIndexOfTag(int setNumber, int tag)
-    {
+    int getIndexOfTag(int setNumber, int tag) {
         return tagArray.get(setNumber).indexOf(tag);
     }
 
-    void updateLRU(int setNumber, int tag)
-    {
+    void updateLRU(int setNumber, int tag) {
         LinkedList<Integer> curSet1 = tagArray.get(setNumber);
         LinkedList<Block> curSet2 = blockArray.get(setNumber);
 
@@ -213,8 +201,7 @@ class CacheLevel
         blockArray.set(setNumber, curSet2);
     }
 
-    void addToLinkedLists(int setNumber, int tag, Block block)
-    {
+    void addToLinkedLists(int setNumber, int tag, Block block) {
         LinkedList<Integer> curSet1 = tagArray.get(setNumber);
         curSet1.addFirst(tag);
         tagArray.set(setNumber, curSet1);
