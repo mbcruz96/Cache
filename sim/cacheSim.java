@@ -429,6 +429,20 @@ class CacheSim
         else
         {
             //l2 does not exist execution
+            while (in.hasNext())
+            {
+                String nextLine = in.nextLine();
+                char op = nextLine.charAt(0);
+                long address = Long.parseLong(nextLine.substring(2), 16);
+                int L1SetNumber = (int)(address % cache.L1.numSets);
+                int L1Tag = (int)(address / cache.L1.numSets);
+                
+                //execute operation
+                cache.L1.performOperation(op, L1SetNumber, L1Tag);
+                
+            }
+            cache.L1.printStats();
+            // cache.L2.printStats();
         }
     }
 }
