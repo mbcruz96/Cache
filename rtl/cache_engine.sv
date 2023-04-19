@@ -30,8 +30,8 @@ module cache_engine(
       input[7:0] cache_op,
       output reg[31:0] curr_tag,
       output reg[11:0] curr_set,
-      output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
-      output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes,
+      output reg[17:0] L1_reads, L1_misses, L1_hits, L1_writes,
+      output reg[17:0] L2_reads, L2_misses, L2_hits, L2_writes,
       output reg[31:0] L1_tag, L1_index, L2_tag, L2_index,
       output reg[31:0] L1_cache [0:L1_NUMSETS-1][0:L1_ASSOC-1],
       output reg[31:0] L2_cache [0:L2_NUMSETS-1][0:L2_ASSOC-1]
@@ -53,7 +53,7 @@ module cache_engine(
     case(state)
         
         // Idle state for cache, keep cache state value the same
-        IDLE: next_state <= (cache_addr != prev_addr) ? READ:IDLE;
+        IDLE: next_state <= (cache_addr != 0) ? READ:IDLE;
         
         // Read in address to find tag, index, and block off-set
         READ: next_state <= SEARCH;
@@ -185,7 +185,8 @@ module cache_engine(
                 for(i = 0; i < L2_ASSOC; i = i + 1)begin        
                     if(L2_tag == L2_cache[L2_index][i])begin
                             L2_found <= 1'b1;
-                            L2_hits <= L2_hits + 1;
+                            if(inclusion_policy != 2)
+                                L2_hits <= L2_hits + 1;
                             L2_lru_index = i;
                             break;
                     end
@@ -300,7 +301,7 @@ module cache_engine(
     
                     // L2 cache
                     else if(!L1_found && L2_found) begin
-                    
+                        L2_hits <= L2_hits + 1;
                         L1_misses <= L1_misses + 1;
                         L1_reads <= L1_reads + 1;
                         if(write_policy == 1 && cache_op == 7'h57)begin
@@ -332,7 +333,7 @@ module cache_engine(
                                     L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                                for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
                                     L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                                 end
                                     
@@ -347,7 +348,7 @@ module cache_engine(
                                     L1_cache[L2_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                                for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
                                     L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
                                 end
                                     
@@ -383,7 +384,7 @@ module cache_engine(
                                     L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                                for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
                                     L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                                 end
                                     
@@ -398,7 +399,7 @@ module cache_engine(
                                     L1_cache[L2_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                                for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
                                     L1_cache[L2_index][i] <= L1_cache[L2_index][i-1];
                                 end
                                     
@@ -412,10 +413,10 @@ module cache_engine(
                 L2_found <= 1'b0;
         end
         
-        // Finish LRU or FIFO address insertion and calculate cache miss rate
-        else if(next_state == DONE)begin
-            prev_addr <= cache_addr;
-        end
+//        // Finish LRU or FIFO address insertion and calculate cache miss rate
+//        else if(next_state == DONE)begin
+//            prev_addr <= cache_addr;
+//        end
     end
   end
   

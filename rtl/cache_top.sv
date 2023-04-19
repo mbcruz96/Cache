@@ -28,8 +28,8 @@ module cache_top(
   input[1:0] inclusion_policy,
   input[47:0] cache_addr,
   input[7:0] cache_op,
-  output reg[11:0] L1_reads, L1_misses, L1_hits, L1_writes,
-  output reg[11:0] L2_reads, L2_misses, L2_hits, L2_writes
+  output reg[17:0] L1_reads, L1_misses, L1_hits, L1_writes,
+  output reg[17:0] L2_reads, L2_misses, L2_hits, L2_writes
 );
 
   // write_policy: 0 -> write through | 1 -> write back                         DONE
