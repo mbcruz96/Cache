@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +19,7 @@ typedef struct Node{
     struct Block data;
     struct Node *next;
     struct Node *previous;
-}Node;
+} Node;
 
 typedef struct Set
 {
@@ -51,8 +52,8 @@ void evictBlock(int currentLevel, Block *blockAddress);
 void evictBlockFIFO(int currentLevel, Block *blockAddress);
 void LRUPolicy(Node *temp, int currentLevel, int currentSet);
 void inclusion(int currentLevel, int operation, Block *blockAddress);
-void inclusionFIFO(int currentLevel, int operation, Block *blockAddress);
-void pushFIFO(Node *temp, int currentLevel, int currentSet)
+void FIFOPolicy(int currentLevel, int operation, Block *blockAddress);
+void pushFIFO(Node *temp, int currentLevel, int currentSet);
 Block *createMemoryAddress(int operation, unsigned long long int address, int* NUM_CACHE_SETS);
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets);
 
@@ -154,26 +155,32 @@ int main(int argc, char *argv[])
     MAIN_CACHE[1] = createCacheLevel(2, L2_CACHE_SIZE, L2_ASSOCIATIVITY, NUM_CACHE_SETS[1]);
 
     printInfo();
+    int count = 0;
     // read file for debugging
     while (!feof(INPUT_FILE)) {
         int read = fscanf(INPUT_FILE, " %c %llx", &operation, &address);
-        printf("read: %i %llx\n", operation, address);
+        if (count < 10){
+	        printf("read: %c %llx\n", operation, address);
+    	}
         if(read == EOF){
             break;
         }
-        printf("still read: %i %llx\n", operation, address);
-
+     	if (count < 10){
+	        printf("still read: %c %llx\n", operation, address);
+		}
+        Block *blockAddress = createMemoryAddress(opIntRep, address, NUM_CACHE_SETS);
         if(operation =='r'){
             opIntRep = 0;
+            //printf("Read: %llx (tag: %llx, index: %d)\n", address, blockAddress->tag, blockAddress->index);
         }
         else if(operation =='w'){
             opIntRep = 1;
+            //printf("Write: %llx (tag: %llx, index: %d)\n", address, blockAddress->tag, blockAddress->index);
         }
-        Block *blockAddress = createMemoryAddress(opIntRep, address, NUM_CACHE_SETS);
         checkTag(opIntRep, blockAddress);
         // free blockAddress after use, relevent data has been copied to cache
         free(blockAddress);
-
+		count += 1;
     }
     // calculate miss rates
     if(readMisses[0] == 0 || writeMisses[0] == 0){
@@ -405,15 +412,15 @@ void pushFIFO(Node *temp, int currentLevel, int currentSet){
     	MAIN_CACHE[currentLevel]->sets[currentSet].head = temp;
     	MAIN_CACHE[currentLevel]->sets[currentSet].tail = temp;
     	// increasing set size
-    	MAIN_CACHE[currentLevel]->sets[currentSet].numSets += 1;
+    	MAIN_CACHE[currentLevel]->sets[currentSet].size += 1;
     	return;
     }
     else{
-    	MAIN_CACHE[currentLevel]->sets[currentSet].tail->next = newNode;
+    	MAIN_CACHE[currentLevel]->sets[currentSet].tail->next = temp;
 		temp->previous = MAIN_CACHE[currentLevel]->sets[currentSet].tail;
-		MAIN_CACHE[currentLevel]->sets[currentSet].tail = newNode;
+		MAIN_CACHE[currentLevel]->sets[currentSet].tail = temp;
 		// increasing set size
-		MAIN_CACHE[currentLevel]->sets[currentSet].numSets += 1;
+		MAIN_CACHE[currentLevel]->sets[currentSet].size += 1;
 		return;
     }
 }
@@ -484,53 +491,30 @@ void inclusion(int currentLevel, int operation, Block *blockAddress){
 }
 
 
-void FIFOInclusion(int currentLevel, int operation, Block *blockAddress){
+void FIFOPolicy(int currentLevel, int operation, Block *blockAddress){
 	Node *newNode = (Node*)malloc(sizeof(Node));
 	
     newNode->data = blockAddress[currentLevel];
 
     newNode->next = NULL;
     newNode->previous = NULL;
+    
     // if the current tag is 0x80039 and index is 126, print that info
     if (blockAddress[currentLevel].tag == 0x80039 && blockAddress[currentLevel].index == 126) {
         printf("%x, index %i\n", blockAddress[currentLevel].tag , blockAddress[currentLevel].index);
     }
-
-	pushFIFO(newNode, currentLevel, Block *blockAddress);
 	
-	if (blockAddress[currentLevel].tag == 0x80039 && blockAddress[currentLevel].index == 126) {
-        printf("%x, index %i\n", blockAddress[currentLevel].tag , blockAddress[currentLevel].index);
-    }
+	if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size >= MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
 
-    if(MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size > MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].capacity){
-        // evict LRU node
         if (blockAddress[currentLevel].tag == 0x80039 && blockAddress[currentLevel].index == 126) {
             printf("%x, index %i\n", blockAddress[currentLevel].tag , blockAddress[currentLevel].index);
         }
-    evictBlockFIFO(currentLevel, blockAddress);    
+		evictBlockFIFO(currentLevel, blockAddress);    
+	}
+	
+	// pushing block to back of queue
+	pushFIFO(newNode, currentLevel, blockAddress[currentLevel].index);
 }
-
-
-void evictBlock(int currentLevel, Block *blockAddress){
-	Node *deleteNode = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
-	deleteNode->next->previous = NULL;
-	MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head = deleteNode->next;
-	MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size -= 1;
-	// update access traffic to memory
-    if (deleteNode->data.dirtyBit == 1) {
-        memoryTraffic += 1;
-        writeBacks[currentLevel] += 1;
-    }
-    // if we are not at the bottom level
-    if(currentLevel < 1){
-        inclusion(currentLevel + 1, deleteNode->data.dirtyBit, blockAddress);
-    }
-    
-    printf("evicting: %x, %i\n", deleteNode->data.tag , deleteNode->data.index);
-
-    free(deleteNode);
-}
-
 
 void evictBlock(int currentLevel, Block *blockAddress){
     Node *deleteNode = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].tail;
@@ -542,13 +526,40 @@ void evictBlock(int currentLevel, Block *blockAddress){
         memoryTraffic += 1;
         writeBacks[currentLevel] += 1;
     }
-    // if we are not at the bottom level
-    if(currentLevel < 1){
-        inclusionFIFO(currentLevel + 1, deleteNode->data.dirtyBit, blockAddress);
-    }
-    
     printf("evicting: %x, %i\n", deleteNode->data.tag , deleteNode->data.index);
 
+    free(deleteNode);
+}
+
+void evictBlockFIFO(int currentLevel, Block *blockAddress){
+	// if the index is greater than the capacity at current level, return
+	// block does not exist on this cache level
+	if (blockAddress[currentLevel].index > MAIN_CACHE[currentLevel]->numSets){
+		return;
+	}
+	Node *deleteNode = MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head;
+	deleteNode->next->previous = NULL;
+	MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].head = deleteNode->next;
+	MAIN_CACHE[currentLevel]->sets[blockAddress[currentLevel].index].size -= 1;
+	// update access traffic to memory
+    if (deleteNode->data.dirtyBit == 1) {
+        memoryTraffic += 1;
+        writeBacks[currentLevel] += 1;
+    }
+    printf("evicting: %x, %i\n", deleteNode->data.tag , deleteNode->data.index);
+	/*
+	if (INCLUSION_PROPERTY == 1 && TOTAL_LEVELS == 2 && currentLevel == 1){
+		//if (blockAddress[currentLevel].index MAIN_CACHE[currentLevel-1]->sets[blockAddress->index].capacity
+		Node *ptr = MAIN_CACHE[currentLevel-1]->sets[blockAddress[currentLevel - 1].index].head;
+        while(ptr != NULL){
+            //if found in cache
+            // if not found before in a previous level
+            if(ptr->data.tag == blockAddress[currentLevel-1].tag){
+                evictBlockFIFO(currentLevel - 1, blockAddress);
+            }
+            ptr = ptr->next;
+        }
+	}*/
     free(deleteNode);
 }
 
@@ -581,10 +592,8 @@ void checkTag(int operation, Block *blockAddress){
                 found = 1;
                 //if not head
                 if(ptr->previous != NULL){
-                	if(REPLACEMENT_POLICY == 1){
-                    	//move to head
-                    	LRUPolicy(ptr, currentLevel, blockAddress[currentLevel].index);
-                    }
+                    //move to head
+                    LRUPolicy(ptr, currentLevel, blockAddress[currentLevel].index);
                 }
             }
             ptr = ptr->next;
@@ -605,7 +614,7 @@ void checkTag(int operation, Block *blockAddress){
 	            inclusion(currentLevel, operation, blockAddress);
     		}
     		else if(REPLACEMENT_POLICY == 2){
-    			inclusionFIFO(currentLevel, operation, blockAddress);
+    			FIFOPolicy(currentLevel, operation, blockAddress);
     		}
             // update access traffic to memory
             memoryTraffic += 1;
@@ -614,8 +623,8 @@ void checkTag(int operation, Block *blockAddress){
 }
 
 Block *createMemoryAddress(int operation, unsigned long long int address, int* NUM_CACHE_SETS){
-    
-    Block *block = (Block*)malloc(sizeof(Block) * TOTAL_LEVELS); 
+   // check if read or write
+   Block *block = (Block*)malloc(sizeof(Block) * TOTAL_LEVELS); 
     for (int i = 0; i < TOTAL_LEVELS; i++){
         int tagBits = log2(BLOCK_SIZE) + log2(MAIN_CACHE[i]->numSets);
         int blockOffset = log2(BLOCK_SIZE);
@@ -642,7 +651,9 @@ Block *createMemoryAddress(int operation, unsigned long long int address, int* N
         }
     }
     return block;
+   	
 }
+
 
 // A utility function to create a cache level
 CacheLevel *createCacheLevel(int level, int cacheSize, int associativity, int numSets) {
