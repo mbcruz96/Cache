@@ -119,6 +119,7 @@ class CacheLevel
 
             if (replacementPolicy == 3)
             {
+                //perform optimal replacement
 
             }
             else
@@ -187,6 +188,7 @@ class CacheLevel
             // optimal replacement policy placeholder
             if (replacementPolicy == 3) {
                 // perform optimal replacement
+
             } else {
                 // perform LRU/FIFO replacement
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
@@ -258,6 +260,11 @@ class CacheLevel
         LinkedList<Block> curSet2 = blockArray.get(setNumber);
         curSet2.addFirst(block);
         blockArray.set(setNumber, curSet2);
+    }
+
+    void doOptimalReplacement()
+    {
+
     }
 
     Boolean contains(int setNumber, int tag)
@@ -567,5 +574,10 @@ class CacheSim
             cache.L1.printCache();
             // cache.L2.printStats();
         }
+    }
+
+    void scanInAddresses()
+    {
+        
     }
 }
