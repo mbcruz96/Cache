@@ -294,7 +294,15 @@ class CacheLevel
             System.out.print("Set " + i + "    ");
             for (Block curBlock : curSet)
             {
-                System.out.print(Integer.toHexString(curBlock.tag) + " " + curBlock.dirty + "     ");
+                System.out.print(Integer.toHexString(curBlock.tag) + " ");
+                if(curBlock.dirty == true)
+                {
+                    System.out.print("D  ");
+                }
+                else
+                {
+                    System.out.print("   ");
+                }
             }
             System.out.println();
         }
