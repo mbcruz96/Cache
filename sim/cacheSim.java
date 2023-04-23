@@ -257,16 +257,6 @@ class CacheLevel {
         return /* tagArray.get(setNumber).contains(tag) && */ condition;
     }
 
-    // void printStats() {
-    // System.out.println("Reads: " + reads);
-    // System.out.println("Read Misses: " + this.readMisses);
-    // System.out.println("Writes: " + writes);
-    // System.out.println("Write Misses: " + this.writeMisses);
-    // System.out.printf("Miss Ratio: %.6f\n",
-    // (double) (this.readMisses + this.writeMisses) / (this.reads + this.writes));
-    // System.out.println("Writebacks: " + this.writebacks);
-    // }
-
     void printCache() {
         for (int i = 0; i < this.numSets; i++) {
             LinkedList<Block> curSet = blockArray.get(i);
@@ -321,6 +311,10 @@ class OverallCache {
             }
 
         } else {
+            // if(op == 'w') {
+            // L1.writeMisses++;
+            // L1.writeMisses++;
+            // }
             state = 3;
 
         }
@@ -339,7 +333,6 @@ class OverallCache {
             L1.performOperation(op, L1SetNumber, L1Tag, address);
         } else if (state == 1) {
             // exists only in l1, deal with eviction but do nothing else
-            // L2.misses++;
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
 
             if (evicted.valid && evicted.dirty) {
@@ -347,8 +340,10 @@ class OverallCache {
                         & ((1 << CacheSim.indexBits2) - 1);
                 int newL2Tag = evicted.address >> CacheSim.tagBits2;
 
-                this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
+                // taylors comments
+                // L2.writeMisses++;
 
+                this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
             }
         } else if (state == 2) {
             // exists only in l2, move it into l1, deal with the eviction it causes
@@ -359,6 +354,11 @@ class OverallCache {
                 int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
                         & ((1 << CacheSim.indexBits2) - 1);
                 int newL2Tag = evicted.address >> CacheSim.tagBits2;
+
+                // taylors comments
+                // if (op == 'r') {
+                // L2.writeMisses++;
+                // }
 
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
 
@@ -480,7 +480,7 @@ class CacheSim {
         }
 
         boolean L2Exists = (l2Size > 0 ? true : false);
-        System.out.println(L2Exists);
+        // System.out.println(L2Exists);
         OverallCache cache;
         if (L2Exists) {
             cache = new OverallCache(l1Assoc, l1Size, l2Assoc, l2Size, blockSize, replacementPolicyInt,
@@ -522,13 +522,6 @@ class CacheSim {
                 cache.startOperation(op, index1, tag1, index2, tag2, (int) address);
 
             }
-            // System.out.println("L1:");
-            // cache.L1.printStats();
-            // cache.L1.printCache();
-            // System.out.println();
-            // System.out.println("L2:");
-            // cache.L2.printStats();
-            // cache.L2.printCache();
         } else {
             // l2 does not exist execution
             while (in.hasNext()) {
@@ -544,11 +537,6 @@ class CacheSim {
                 cache.L1.performOperation(op, L1SetNumber, L1Tag, (int) address);
 
             }
-
-            // cache.L1.printStats();
-            // cache.L1.printCache();
-            // // cache.L2.printStats();
-            // finalPrint(cache.L1, cache.L2, L2Exists, inclusionPropertyInt, traceFile);
         }
         finalPrint(cache.L1, cache.L2, L2Exists, inclusionPropertyInt, traceFile);
     }
@@ -602,10 +590,12 @@ class CacheSim {
         if (L2Exists) {
             System.out.println("g. number of L2 reads:\t\t" + L2.reads);
             System.out.println("h. number of L2 read misses:\t" + L2.readMisses);
-            System.out.println("i. number of L2 writes:\t\t" + L2.writes);
+            // the only way for something to write to L2 is a writeback from a lower cache
+            System.out.println("i. number of L2 writes:\t\t" + L1.writebacks);
             System.out.println("j. number of L2 write misses:\t" + L2.writeMisses);
             System.out.printf(
-                    "k. L2 miss rate:\t\t%.6f\n", (double) (L2.readMisses + L2.writeMisses) / (L2.reads + L2.writes));
+                    "k. L2 miss rate:\t\t%.6f\n",
+                    (double) (L2.readMisses + L2.writeMisses) / (L2.reads));
             System.out.println("l. number of L2 writebacks:\t" + L2.writebacks);
         } else {
             System.out.println("g. number of L2 reads:\t\t" + 0);
@@ -615,6 +605,10 @@ class CacheSim {
             System.out.println("k. L2 miss rate:\t\t" + 0);
             System.out.println("l. number of L2 writebacks:\t" + 0);
         }
-        System.out.println("m. total memory traffic:\t" + -1);
+        if (L2Exists) {
+            System.out.println("m. total memory traffic:\t" + (L2.readMisses + L2.writebacks));
+        } else {
+            System.out.println("m. total memory traffic:\t" + (L1.readMisses + L1.writeMisses + L1.writebacks));
+        }
     }
 }
