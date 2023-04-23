@@ -95,7 +95,8 @@ class CacheLevel
             curBlock.dirty = true;
             blockArray.get(setNumber).set(index, curBlock);
 
-            if (replacementPolicy == 1)
+            //move MRU to front on access
+            if (replacementPolicy == 1 || replacementPolicy == 4)
             {
                 updateLRU(setNumber, tag);
             }
@@ -132,7 +133,7 @@ class CacheLevel
                 }
                 return evictedBlock;
             }
-            else
+            else if (replacementPolicy == 1 || replacementPolicy == 2)
             {
                 //perform LRU/FIFO replacement
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
@@ -140,6 +141,27 @@ class CacheLevel
 
                 int removedTag = curSet1.removeLast();
                 removedBlock = curSet2.removeLast();
+
+                //deal with dirty bits as necessary
+                if (removedBlock.dirty == true)
+                {
+                    this.writebacks++;
+                }
+                //add new elements to replacement linked lists
+                curSet1.addFirst(tag);
+                curSet2.addFirst(newBlock);
+
+                tagArray.set(setNumber, curSet1);
+                blockArray.set(setNumber, curSet2);
+            }
+            else
+            {
+                //perform MRU/LIFO replacement
+                LinkedList<Integer> curSet1 = tagArray.get(setNumber);
+                LinkedList<Block> curSet2 = blockArray.get(setNumber);
+
+                int removedTag = curSet1.removeFirst();
+                removedBlock = curSet2.removeFirst();
 
                 //deal with dirty bits as necessary
                 if (removedBlock.dirty == true)
@@ -205,13 +227,36 @@ class CacheLevel
                     writebacks++;
                 }
                 return evictedBlock;
-            } else {
+            } 
+            else if (replacementPolicy == 1 || replacementPolicy == 2)
+            {
                 // perform LRU/FIFO replacement
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
                 LinkedList<Block> curSet2 = blockArray.get(setNumber);
 
                 int removedTag = curSet1.removeLast();
                 removedBlock = curSet2.removeLast();
+
+                //deal with dirty bits as necessary
+                if (removedBlock.dirty == true)
+                {
+                    this.writebacks++;
+                }
+                //add new elements to replacement linked lists
+                curSet1.addFirst(tag);
+                curSet2.addFirst(newBlock);
+
+                tagArray.set(setNumber, curSet1);
+                blockArray.set(setNumber, curSet2);
+            }
+            else
+            {
+                //perform MRU/LIFO replacement
+                LinkedList<Integer> curSet1 = tagArray.get(setNumber);
+                LinkedList<Block> curSet2 = blockArray.get(setNumber);
+
+                int removedTag = curSet1.removeFirst();
+                removedBlock = curSet2.removeFirst();
 
                 //deal with dirty bits as necessary
                 if (removedBlock.dirty == true)
@@ -553,6 +598,10 @@ class CacheSim
             replacementPolicyInt = 2;
         } else if (replacementPolicy.equals("OPTIMAL")) {
             replacementPolicyInt = 3;
+        } else if (replacementPolicy.equals("MRU")) {
+            replacementPolicyInt = 4;
+        } else if (replacementPolicy.equals("LIFO")) {
+            replacementPolicyInt = 5;
         }
 
         // convert the inclusion property to an integer
