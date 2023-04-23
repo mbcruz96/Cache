@@ -62,10 +62,8 @@ class CacheLevel {
 
     Block performOperation(char op, int setNumber, int tag, int address) {
         if (op == 'w') {
-            this.writes++;
             return performWrite(setNumber, tag, address);
         } else {
-            this.reads++;
             return performRead(setNumber, tag, address);
         }
     }
@@ -87,12 +85,12 @@ class CacheLevel {
                 updateLRU(setNumber, tag);
             }
 
-            // this.writes++;
+            this.writes++;
 
             return removedBlock;
         } else {
             this.writeMisses++;
-            // this.writes++;
+            this.writes++;
 
             Block newBlock = new Block();
             newBlock.dirty = true;
@@ -101,33 +99,9 @@ class CacheLevel {
             newBlock.address = address;
 
             if (tagArray.get(setNumber).size() < this.associativity) {
-                // if (setNumber == 126) {
-                // System.out.print("looking for tag " + Integer.toHexString(tag) + " in set " +
-                // setNumber);
-                // System.out.println("");
-                // System.out.print("before: ");
-
-                // for (int i = 0; i < tagArray.get(setNumber).size(); i++) {
-                // System.out.print(" " +
-                // Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
-                // }
-                // System.out.println("");
-
-                // }
 
                 // insert to both without worrying, no need to evict because there is space left
                 addToLinkedLists(setNumber, tag, newBlock);
-                // if (setNumber == 126) {
-                // System.out.print("after: ");
-
-                // for (int i = 0; i < tagArray.get(setNumber).size(); i++) {
-                // System.out.print(" " +
-                // Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
-                // }
-                // System.out.println("");
-                // System.out.println("-------------------------------");
-
-                // }
 
                 return removedBlock;
             }
@@ -150,21 +124,10 @@ class CacheLevel {
                 // add new elements to replacement linked lists
                 curSet1.addFirst(tag);
                 curSet2.addFirst(newBlock);
-                // delroy's comment
-                // if (setNumber == 126) {
-                // System.out.println("trying to add L2 tag: " + Integer.toHexString(tag));
-                // System.out.println("trying to evict the last L2 tag: " +
-                // Integer.toHexString(curSet1.peekLast()));
-                // // print operation
-                // System.out.println("write");
-                // // print out the curset1
-                // for (int i = 0; i < curSet1.size(); i++) {
-                // System.out.println(Integer.toHexString(curSet1.get(i)));
-                // }
-                // }
 
                 tagArray.set(setNumber, curSet1);
                 blockArray.set(setNumber, curSet2);
+
             }
 
             // make sure its valid so I can use the evicted block later
@@ -185,11 +148,11 @@ class CacheLevel {
                 updateLRU(setNumber, tag);
             }
 
-            // this.reads++;
+            this.reads++;
             return removedBlock;
         } else {
             this.readMisses++;
-            // this.reads++;
+            this.reads++;
 
             // create the new block to insert
             Block newBlock = new Block();
@@ -200,36 +163,8 @@ class CacheLevel {
 
             // cache set is not full
             if (tagArray.get(setNumber).size() < this.associativity) {
-                // System.out.println("set: " + setNumber);
-                // if (setNumber == 126) {
-                // System.out.print("looking for tag " + Integer.toHexString(newBlock.tag) + "
-                // in set " + setNumber);
-                // System.out.println("");
-                // System.out.print("before: ");
-
-                // for (int i = 0; i < blockArray.get(setNumber).size(); i++) {
-                // System.out.print(" " +
-                // Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
-                // }
-                // System.out.println("");
-
-                // }
-
                 // insert to both without worrying, no need to evict because there is space left
                 addToLinkedLists(setNumber, tag, newBlock);
-
-                // if (setNumber == 126) {
-                // System.out.print("after: ");
-
-                // for (int i = 0; i < tagArray.get(setNumber).size(); i++) {
-                // System.out.print(" " +
-                // Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
-                // }
-                // System.out.println("");
-                // System.out.println("-----------------------------");
-
-                // }
-
                 return removedBlock;
             }
 
@@ -242,18 +177,6 @@ class CacheLevel {
                 // perform LRU/FIFO replacement
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
                 LinkedList<Block> curSet2 = blockArray.get(setNumber);
-                // delroy's comment
-                // if (setNumber == 126) {
-                // System.out.println("trying to add L2 tag: " + Integer.toHexString(tag));
-                // System.out.println("trying to evict the last L2 tag: " +
-                // Integer.toHexString(curSet1.peekLast()));
-                // // print operation
-                // System.out.println("write");
-                // // print out the curset1
-                // for (int i = 0; i < curSet1.size(); i++) {
-                // System.out.println(Integer.toHexString(curSet1.get(i)));
-                // }
-                // }
 
                 int removedTag = curSet1.removeLast();
                 removedBlock = curSet2.removeLast();
@@ -294,18 +217,6 @@ class CacheLevel {
     void updateLRU(int setNumber, int tag) {
         LinkedList<Integer> curSet1 = tagArray.get(setNumber);
         LinkedList<Block> curSet2 = blockArray.get(setNumber);
-        // if (setNumber == 126) {
-        // System.out.print("looking for tag " + Integer.toHexString(tag) + " in set " +
-        // setNumber);
-        // System.out.println("");
-        // System.out.print("before: ");
-
-        // for (int i = 0; i < curSet1.size(); i++) {
-        // System.out.print(" " + Integer.toHexString(curSet1.get(i)) + " -> ");
-        // }
-        // System.out.println("");
-
-        // }
 
         int index = curSet1.indexOf(tag);
 
@@ -317,17 +228,6 @@ class CacheLevel {
 
         tagArray.set(setNumber, curSet1);
         blockArray.set(setNumber, curSet2);
-
-        // print curSet1
-        // if (setNumber == 126) {
-        // System.out.print("after: ");
-        // for (int i = 0; i < curSet1.size(); i++) {
-        // System.out.print(" " + Integer.toHexString(curSet1.get(i)) + " -> ");
-        // }
-        // System.out.println("");
-        // System.out.println("--------------------");
-
-        // }
 
     }
 
@@ -358,12 +258,12 @@ class CacheLevel {
     }
 
     // void printStats() {
+    // System.out.println("Reads: " + reads);
+    // System.out.println("Read Misses: " + this.readMisses);
+    // System.out.println("Writes: " + writes);
+    // System.out.println("Write Misses: " + this.writeMisses);
     // System.out.printf("Miss Ratio: %.6f\n",
     // (double) (this.readMisses + this.writeMisses) / (this.reads + this.writes));
-    // System.out.println("Writes: " + writes);
-    // System.out.println("Reads: " + reads);
-    // System.out.println("Write Misses: " + this.writeMisses);
-    // System.out.println("Read Misses: " + this.readMisses);
     // System.out.println("Writebacks: " + this.writebacks);
     // }
 
@@ -403,34 +303,25 @@ class OverallCache {
     void startOperation(char op, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address) {
         int state = -1;
         boolean L1Contains = L1.contains(L1SetNumber, L1Tag);
-        boolean L2Contains = L2.contains(L2SetNumber, L2Tag);
+        boolean L2Contains = false;
+        if (!L1Contains) {
+            L2Contains = L2.contains(L2SetNumber, L2Tag);
+        }
 
         if (L1Contains && L2Contains) {
             state = 0;
-            // delroy comments
-            // System.out.printf("L1 hit\n");
-            // System.out.printf("L2 hit\n");
 
         } else if (L1Contains && !L2Contains) {
             state = 1;
-            // System.out.printf("L1 hit\n");
-            // System.out.printf("L2 miss\n");
 
         } else if (!L1Contains && L2Contains) {
             state = 2;
-            // System.out.printf("L1 miss\n");
-            // System.out.printf("L2 hit\n");
             if (op == 'w') {
                 this.L2.reads++;
             }
 
         } else {
             state = 3;
-            // System.out.printf("L1 miss\n");
-            // System.out.printf("L2 miss\n");
-            // if (op == 'W') {
-            // this.L2.reads++;
-            // }
 
         }
 
@@ -446,79 +337,44 @@ class OverallCache {
         if (state == 0) {
             // exists in both, nothing will be evicted, just leave it alone
             L1.performOperation(op, L1SetNumber, L1Tag, address);
-            // if the tag wasnt a hit in L1
-            // this doesnt work here because at this point its already state 0
-            // but this may come up at start operation
-            if (state != 0 && state != 1) {
-                L2.performOperation(op, L2SetNumber, L2Tag, address);
-            }
         } else if (state == 1) {
             // exists only in l1, deal with eviction but do nothing else
             // L2.misses++;
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
-            // delroys comment
-            // System.out.println("L1 victim : "+ (evicted.valid ? evicted.address :
-            // "none"));
 
             if (evicted.valid && evicted.dirty) {
-                // print out the evicted block
-                // delroys comment
-                // System.out.println("(tag + " + Integer.toHexString(evicted.tag) + ", index "
-                // + L1SetNumber + ")");
+                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+                        & ((1 << CacheSim.indexBits2) - 1);
+                int newL2Tag = evicted.address >> CacheSim.tagBits2;
 
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                // if ((newL2Tag == 0x80065 && newL2SetNumber == 126)) {
-                // System.out.println("trying to access L2 tag: " +
-                // Integer.toHexString(newL2Tag));
-                // }
 
             }
         } else if (state == 2) {
             // exists only in l2, move it into l1, deal with the eviction it causes
-            L2.performOperation(op, L2SetNumber, L2Tag, address);
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
-            // delroys comment
-
-            // System.out.println("L1 victim : "+ (evicted.valid ? evicted.address :
-            // "none"));
 
             if (evicted.valid && evicted.dirty) {
-                // delroys comment
-                // System.out.println("(tag + " + Integer.toHexString(evicted.tag) + ", index "
-                // + L1SetNumber + ")");
 
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
+                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+                        & ((1 << CacheSim.indexBits2) - 1);
+                int newL2Tag = evicted.address >> CacheSim.tagBits2;
+
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                // if ((newL2Tag == 0x80065 && newL2SetNumber == 126)) {
-                // System.out.println("trying to access L2 tag: " +
-                // Integer.toHexString(newL2Tag));
-                // }
 
             }
+            L2.performOperation(op, L2SetNumber, L2Tag, address);
+
             // L1.reads--; //subtracting one to account for copying from L2, not memory
         } else if (state == 3) {
             // doesnt exist in either, handle the eviction from l1
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
 
             if (evicted.valid && evicted.dirty) {
-                // delroys comment
+                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+                        & ((1 << CacheSim.indexBits2) - 1);
+                int newL2Tag = evicted.address >> CacheSim.tagBits2;
 
-                // System.out.println("(tag + " + Integer.toHexString(evicted.tag) + ", index "
-                // + L1SetNumber + ")");
-
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
-
-                // if ((newL2Tag == 0x8009b && newL2SetNumber == 126)) {
-                // System.out.println(
-                // "evicted L1 to L2 tag: " + Integer.toHexString(newL2Tag) + " in set: " +
-                // newL2SetNumber);
-                // }
-
-                // todo: if this bit is dirty its a write else read
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
 
             }
@@ -533,72 +389,43 @@ class OverallCache {
         if (state == 0) {
             // exists in both, nothing will be evicted, just leave it alone
             L1.performOperation(op, L1SetNumber, L1Tag, address);
-            L2.performOperation(op, L2SetNumber, L2Tag, address);
+            // L2.performOperation(op, L2SetNumber, L2Tag, address);
         } else if (state == 1) {
             // exists only in l1, deal with eviction but do nothing else
             // L2.misses++;
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
-            // delroys comment
-            // System.out.println("L1 victim : "+ (evicted.valid ? evicted.address :
-            // "none"));
 
             if (evicted.valid && evicted.dirty) {
                 // print out the evicted block
-                // delroys comment
-                // System.out.println("(tag + " + Integer.toHexString(evicted.tag) + ", index "
-                // + L1SetNumber + ")");
 
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
+                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+                        & ((1 << CacheSim.indexBits2) - 1);
+                int newL2Tag = evicted.address >> CacheSim.tagBits2;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                // if ((newL2Tag == 0x80065 && newL2SetNumber == 126)) {
-                // System.out.println("trying to access L2 tag: " +
-                // Integer.toHexString(newL2Tag));
-                // }
-
             }
         } else if (state == 2) {
             // exists only in l2, move it into l1, deal with the eviction it causes
-            L2.performOperation(op, L2SetNumber, L2Tag, address);
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
-            // delroys comment
-
-            // System.out.println("L1 victim : "+ (evicted.valid ? evicted.address :
-            // "none"));
 
             if (evicted.valid && evicted.dirty) {
-                // delroys comment
-                // System.out.println("(tag + " + Integer.toHexString(evicted.tag) + ", index "
-                // + L1SetNumber + ")");
 
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
+                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+                        & ((1 << CacheSim.indexBits2) - 1);
+                int newL2Tag = evicted.address >> CacheSim.tagBits2;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                // if ((newL2Tag == 0x80065 && newL2SetNumber == 126)) {
-                // System.out.println("trying to access L2 tag: " +
-                // Integer.toHexString(newL2Tag));
-                // }
-
             }
+            L2.performOperation('r', L2SetNumber, L2Tag, address);
+
             // L1.reads--; //subtracting one to account for copying from L2, not memory
         } else if (state == 3) {
             // doesnt exist in either, handle the eviction from l1
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
 
             if (evicted.valid && evicted.dirty) {
-                // delroys comment
 
-                // System.out.println("(tag + " + Integer.toHexString(evicted.tag) + ", index "
-                // + L1SetNumber + ")");
-
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
-
-                // if ((newL2Tag == 0x8009b && newL2SetNumber == 126)) {
-                // System.out.println(
-                // "evicted L1 to L2 tag: " + Integer.toHexString(newL2Tag) + " in set: " +
-                // newL2SetNumber);
-                // }
+                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+                        & ((1 << CacheSim.indexBits2) - 1);
+                int newL2Tag = evicted.address >> CacheSim.tagBits2;
 
                 // todo: if this bit is dirty its a write else read
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
@@ -613,6 +440,12 @@ class OverallCache {
 }
 
 class CacheSim {
+    public static int blockOffsetBits;
+    public static int indexBits1;
+    public static int indexBits2;
+    public static int tagBits1;
+    public static int tagBits2;
+
     public static void main(String[] args) throws FileNotFoundException {
         // get the input from the command line in the following order:
         // <BLOCKSIZE> <L1_SIZE> <L1_ASSOC> <L2_SIZE> <L2_ASSOC> <REPLACEMENT_POLICY>
@@ -647,7 +480,7 @@ class CacheSim {
         }
 
         boolean L2Exists = (l2Size > 0 ? true : false);
-        // System.out.println(L2Exists);
+        System.out.println(L2Exists);
         OverallCache cache;
         if (L2Exists) {
             cache = new OverallCache(l1Assoc, l1Size, l2Assoc, l2Size, blockSize, replacementPolicyInt,
@@ -663,30 +496,35 @@ class CacheSim {
                 String nextLine = in.nextLine();
                 char op = nextLine.charAt(0);
                 long address = Long.parseLong(nextLine.substring(2), 16);
-                address = address / cache.L1.blockSize;
-                int L1SetNumber = (int) (address % cache.L1.numSets);
-                int L2SetNumber = (int) (address % cache.L2.numSets);
-                int L1Tag = (int) (address / cache.L1.numSets);
-                int L2Tag = (int) (address / cache.L2.numSets);
 
-                // delroy's comment
-                // if number of lines is 91428 , print the numlines
-                // if (numLines == 91428 || numLines == 88576)
-                // if (numLines == 91428 || numLines == 88576)
-                // {
-                // System.out.println("# " + numLines + " : " + op + " " +
-                // Integer.toHexString((int) address));
-                // }
-                // System.out.println("L1 write : "+Integer.toHexString((int)address)+
-                // " (tag "+Integer.toHexString(L1Tag)+", index "+L1SetNumber+")");
+                // calculate bits and values
+                blockOffsetBits = (int) (Math.log(blockSize) / Math.log(2));
+                int offsetBits = (int) address & ((1 << blockOffsetBits) - 1);
+
+                indexBits1 = (int) (Math.log(cache.L1.numSets) / Math.log(2));
+                indexBits2 = (int) (Math.log(cache.L2.numSets) / Math.log(2));
+                tagBits1 = indexBits1 + blockOffsetBits;
+                tagBits2 = indexBits2 + blockOffsetBits;
+                // get working address
+                address = (int) address ^ offsetBits;
+
+                // shift address by offset and & with mask to get index
+                int index1 = ((int) address >> (blockOffsetBits)) & ((1 << indexBits1) - 1);
+                int index2 = ((int) address >> (blockOffsetBits)) & ((1 << indexBits2) - 1);
+                // extract tag bits by shifting
+                int tag1 = ((int) address >> tagBits1);
+                int tag2 = ((int) address >> tagBits2);
+
                 numLines++;
                 // execute operation
-                cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag, (int) address);
+                // cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag,
+                // (int)address);
+                cache.startOperation(op, index1, tag1, index2, tag2, (int) address);
 
             }
             // System.out.println("L1:");
-            // // cache.L1.printStats();
-            // // cache.L1.printCache();
+            // cache.L1.printStats();
+            // cache.L1.printCache();
             // System.out.println();
             // System.out.println("L2:");
             // cache.L2.printStats();
@@ -702,37 +540,15 @@ class CacheSim {
                 int L1SetNumber = (int) (address % cache.L1.numSets);
                 int L1Tag = (int) (address / cache.L1.numSets);
 
-                // System.out.println("Address: " + String.format("0x%08X", address));
-                // System.out.println("Set Number: " + L1SetNumber);
-                // System.out.println("Tag: " + String.format("0x%08X", L1Tag));
-                // System.out.println();
-
                 // execute operation
                 cache.L1.performOperation(op, L1SetNumber, L1Tag, (int) address);
 
             }
 
-            // while(in.hasNext())
-            // {
-            // // System.out.println("iteration " + counter);
-            // String line = in.nextLine();
-            // char op = line.charAt(0);
-            // String temp = "0" + line.substring(4);
-            // BigInteger bigAddress = new BigInteger(temp, 16);
-            // bigAddress = bigAddress.divide(new BigInteger("" + cache.L1.blockSize));
-            // //address /= cache.blockSize;
-            // long address = bigAddress.longValue();
-            // int setNumber = (int)(address % cache.L1.numSets);
-            // int tag = (int)(address / cache.L1.numSets);
-
-            // // System.out.println(setNumber);
-            // // System.out.println(tag);
-            // cache.L1.performOperation(op, setNumber, tag);
-            // }
-
             // cache.L1.printStats();
             // cache.L1.printCache();
-            // cache.L2.printStats();
+            // // cache.L2.printStats();
+            // finalPrint(cache.L1, cache.L2, L2Exists, inclusionPropertyInt, traceFile);
         }
         finalPrint(cache.L1, cache.L2, L2Exists, inclusionPropertyInt, traceFile);
     }
@@ -774,7 +590,6 @@ class CacheSim {
             L2.printCache();
         }
 
-        // System.out.println();
         System.out.println("===== Simulation results (raw) =====");
         System.out.println("a. number of L1 reads:\t\t" + L1.reads);
         System.out.println("b. number of L1 read misses:\t" + L1.readMisses);
@@ -801,23 +616,5 @@ class CacheSim {
             System.out.println("l. number of L2 writebacks:\t" + 0);
         }
         System.out.println("m. total memory traffic:\t" + -1);
-        // System.out.printf("Miss Ratio: %.6f\n",
-        // (double) (this.readMisses + this.writeMisses) / (this.reads + this.writes));
-        // System.out.println("Writes: " + writes);
-        // System.out.println("Reads: " + reads);
-        // System.out.println("Write Misses: " + this.writeMisses);
-        // System.out.println("Read Misses: " + this.readMisses);
-        // System.out.println("Writebacks: " + this.writebacks);
-
-        // L1.printStats();
-        // System.out.println();
-        // if (L2Exists) {
-        // System.out.println("===== L2 contents =====");
-        // L2.printCache();
-        // System.out.println();
-        // System.out.println("===== L2 contents =====");
-        // L2.printStats();
-        // System.out.println();
-        // }
     }
 }
