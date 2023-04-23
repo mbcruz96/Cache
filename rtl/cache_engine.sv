@@ -189,8 +189,6 @@ module cache_engine(
                 for(i = 0; i < L2_ASSOC; i = i + 1)begin        
                     if(L2_tag == L2_cache[L2_index][i])begin
                             L2_found <= 1'b1;
-                            if(inclusion_policy != 2)
-                                L2_hits <= L2_hits + 1;
                             L2_lru_index = i;
                             break;
                     end
@@ -344,7 +342,7 @@ module cache_engine(
                         L1_cache[L1_index][L1_lru_index] <= 32'b0;
                             
                         // Shifts through the current set with the size of the cache line to shift in LRU order
-                        for(i = L1_ASSOC; i > 0; i = i - 1)begin
+                        for(i = L1_ASSOC-1; i >= 0; i = i - 1)begin
                         
                             if(i <= L1_lru_index)
                                 L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
@@ -365,6 +363,7 @@ module cache_engine(
                                 if(i <= L2_lru_index)
                                     L2_cache[L2_lru_index][i] <= L2_cache[L2_index][i-1];
                                 end
+                                L2_cache[L2_index][0] <= L2_tag;  
                             end
                             
                             // Insert new address at beginning of cache line
@@ -503,7 +502,7 @@ module cache_engine(
                                     L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
+                                for(i = L1_ASSOC-1; i >= 0; i = i - 1)begin
                                     L1_cache[L1_index][i] <= L1_cache[L1_index][i-1];
                                 end
                                     
@@ -518,7 +517,7 @@ module cache_engine(
                                     L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
                                         
                                 // Shifts through the current set with the size of the cache line to shift in FIFO order
-                                for(i = L1_ASSOC-1; i > 0; i = i - 1)begin
+                                for(i = L1_ASSOC-1; i >= 0; i = i - 1)begin
                                     L1_cache[L1_index][i] <= L1_cache[L2_index][i-1];
                                 end
                                     

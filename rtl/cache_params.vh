@@ -4,7 +4,7 @@ parameter BLOCKSIZE = 16;
 
 //L1 Cache properties
 parameter L1_CACHESIZE = 1024;
-parameter L1_ASSOC = 1;
+parameter L1_ASSOC = 2;
 parameter L1_NUMSETS = L1_CACHESIZE/(BLOCKSIZE * L1_ASSOC);
 
 //L2 Cache properties
