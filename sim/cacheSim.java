@@ -112,14 +112,15 @@ class CacheLevel
 
             if (tagArray.get(setNumber).size() < this.associativity)
             {
-                if(setNumber == 126)
+                if(setNumber == 37)
                 {
                     System.out.print("looking for tag "+ Integer.toHexString(tag) + " in set " + setNumber);
                     System.out.println("");
                     System.out.print("before: ");
         
                     for (int i = 0; i < tagArray.get(setNumber).size(); i++) {
-                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
+                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + 
+                            " :"+blockArray.get(setNumber).get(i).dirty+" -> ");
                     }
                     System.out.println("");
         
@@ -127,12 +128,13 @@ class CacheLevel
         
                 //insert to both without worrying, no need to evict because there is space left
                 addToLinkedLists(setNumber, tag, newBlock);
-                if(setNumber == 126)
+                if(setNumber == 37)
                 {
                     System.out.print("after: ");
         
                     for (int i = 0; i < tagArray.get(setNumber).size(); i++) {
-                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
+                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + 
+                            " :"+blockArray.get(setNumber).get(i).dirty+" -> ");
                     }
                     System.out.println("");
                     System.out.println("-------------------------------");
@@ -165,7 +167,7 @@ class CacheLevel
                 curSet1.addFirst(tag);
                 curSet2.addFirst(newBlock);
                 //delroy's comment
-                if(setNumber == 126){
+                if(setNumber == 37){
                     System.out.println("trying to add L2 tag: " + Integer.toHexString(tag)); 
                     System.out.println("trying to evict the last L2 tag: " + Integer.toHexString(curSet1.peekLast())); 
                     //print operation
@@ -178,6 +180,15 @@ class CacheLevel
 
                 tagArray.set(setNumber, curSet1);
                 blockArray.set(setNumber, curSet2);
+                if(setNumber == 37){
+                    // print out the curset1
+                    for (int i = 0; i < curSet1.size(); i++) {
+                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + 
+                            " :"+blockArray.get(setNumber).get(i).dirty+" -> ");
+                    }
+                    System.out.println("");
+                }
+
             }
 
             //make sure its valid so I can use the evicted block later
@@ -216,14 +227,15 @@ class CacheLevel
             // cache set is not full
             if (tagArray.get(setNumber).size() < this.associativity) {
                 System.out.println("set: " + setNumber);
-                if(setNumber == 126)
+                if(setNumber == 37)
                 {
                     System.out.print("looking for tag "+ Integer.toHexString(newBlock.tag) + " in set " + setNumber);
                     System.out.println("");
                     System.out.print("before: ");
         
                     for (int i = 0; i < blockArray.get(setNumber).size(); i++) {
-                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
+                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + 
+                            " :"+blockArray.get(setNumber).get(i).dirty+" -> ");
                     }
                     System.out.println("");
         
@@ -232,12 +244,13 @@ class CacheLevel
                 // insert to both without worrying, no need to evict because there is space left
                 addToLinkedLists(setNumber, tag, newBlock);
 
-                if(setNumber == 126)
+                if(setNumber == 37)
                 {
                     System.out.print("after: ");
         
                     for (int i = 0; i < tagArray.get(setNumber).size(); i++) {
-                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + " -> ");
+                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + 
+                            " :"+blockArray.get(setNumber).get(i).dirty+" -> ");
                     }
                     System.out.println("");
                     System.out.println("-----------------------------");
@@ -257,7 +270,7 @@ class CacheLevel
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
                 LinkedList<Block> curSet2 = blockArray.get(setNumber);
                 //delroy's comment
-                if(setNumber == 126){
+                if(setNumber == 37){
                     System.out.println("trying to add L2 tag: " + Integer.toHexString(tag)); 
                     System.out.println("trying to evict the last L2 tag: " + Integer.toHexString(curSet1.peekLast())); 
                     //print operation
@@ -282,6 +295,15 @@ class CacheLevel
 
                 tagArray.set(setNumber, curSet1);
                 blockArray.set(setNumber, curSet2);
+                if(setNumber == 37){
+                    // print out the curset1
+                    for (int i = 0; i < curSet1.size(); i++) {
+                        System.out.print(" " + Integer.toHexString(blockArray.get(setNumber).get(i).tag) + 
+                            " :"+blockArray.get(setNumber).get(i).dirty+" -> ");
+                    }
+                    System.out.println("");
+                }
+
             }
 
             removedBlock.valid = true;
@@ -313,14 +335,14 @@ class CacheLevel
     void updateLRU(int setNumber, int tag) {
         LinkedList<Integer> curSet1 = tagArray.get(setNumber);
         LinkedList<Block> curSet2 = blockArray.get(setNumber);
-        if(setNumber == 126)
+        if(setNumber == 37)
         {
             System.out.print("looking for tag "+ Integer.toHexString(tag) + " in set " + setNumber);
             System.out.println("");
             System.out.print("before: ");
 
             for (int i = 0; i < curSet1.size(); i++) {
-                System.out.print(" " + Integer.toHexString(curSet1.get(i)) + " -> ");
+                System.out.print(" " + Integer.toHexString(curSet1.get(i)) + " :"+curSet2.get(i).dirty +" -> ");
             }
             System.out.println("");
 
@@ -338,11 +360,11 @@ class CacheLevel
         blockArray.set(setNumber, curSet2);
         
         // print curSet1
-        if(setNumber == 126)
+        if(setNumber == 37)
         {
             System.out.print("after: ");
             for (int i = 0; i < curSet1.size(); i++) {
-                System.out.print(" " + Integer.toHexString(curSet1.get(i)) + " -> ");
+                System.out.print(" " + Integer.toHexString(curSet1.get(i)) + " "+curSet2.get(i).dirty +"-> ");
             }
             System.out.println("");
             System.out.println("--------------------");
@@ -439,12 +461,15 @@ class OverallCache
     {
         int state = -1;
         boolean L1Contains = L1.contains(L1SetNumber, L1Tag);
-        boolean L2Contains = L2.contains(L2SetNumber, L2Tag);
+        boolean L2Contains = false;
+        if(!L1Contains){
+            L2Contains = L2.contains(L2SetNumber, L2Tag);
+        }
 
         if (L1Contains && L2Contains)
         {
             state = 0;
-            // delroy comments
+            // delroy's comments
             // System.out.printf("L1 hit\n");
             // System.out.printf("L2 hit\n");
 
@@ -491,9 +516,7 @@ class OverallCache
             // if the tag wasnt a hit in L1
             // this doesnt work here  because at this point its already state 0
             // but this may come up at start operation
-            if(state != 0 && state != 1){
-                L2.performOperation(op, L2SetNumber, L2Tag, address);
-            }
+            //L2.performOperation(op, L2SetNumber, L2Tag, address);
         }
         else if (state == 1)
         {
@@ -512,7 +535,7 @@ class OverallCache
                 int newL2SetNumber = evicted.address % this.L2.numSets;
                 int newL2Tag = evicted.address / this.L2.numSets;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                if((newL2Tag == 0x80065 && newL2SetNumber == 126)){
+                if((newL2Tag == 0x80065 && newL2SetNumber == 37)){
                     System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
                 }
         
@@ -536,7 +559,7 @@ class OverallCache
                 int newL2SetNumber = evicted.address % this.L2.numSets;
                 int newL2Tag = evicted.address / this.L2.numSets;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                if((newL2Tag == 0x80065 && newL2SetNumber == 126)){
+                if((newL2Tag == 0x80065 && newL2SetNumber == 37)){
                     System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
                 }
 
@@ -557,7 +580,7 @@ class OverallCache
                 int newL2SetNumber = evicted.address % this.L2.numSets;
                 int newL2Tag = evicted.address / this.L2.numSets;
 
-                if((newL2Tag == 0x8009b && newL2SetNumber == 126)){
+                if((newL2SetNumber == 37)){
                     System.out.println("evicted L1 to L2 tag: " + Integer.toHexString(newL2Tag) + " in set: " + newL2SetNumber);        
                 }
 
@@ -579,7 +602,7 @@ class OverallCache
         {
             //exists in both, nothing will be evicted, just leave it alone
             L1.performOperation(op, L1SetNumber, L1Tag, address);
-            L2.performOperation(op, L2SetNumber, L2Tag, address);
+            //L2.performOperation(op, L2SetNumber, L2Tag, address);
         }
         else if (state == 1)
         {
@@ -598,17 +621,14 @@ class OverallCache
                 int newL2SetNumber = evicted.address % this.L2.numSets;
                 int newL2Tag = evicted.address / this.L2.numSets;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                if((newL2Tag == 0x80065 && newL2SetNumber == 126)){
+                if((newL2SetNumber == 37)){
                     System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
                 }
-        
-        
             }
         }
         else if (state == 2)
         {
             //exists only in l2, move it into l1, deal with the eviction it causes
-            L2.performOperation(op, L2SetNumber, L2Tag, address);
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
             //delroys comment
             
@@ -622,11 +642,13 @@ class OverallCache
                 int newL2SetNumber = evicted.address % this.L2.numSets;
                 int newL2Tag = evicted.address / this.L2.numSets;
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-                if((newL2Tag == 0x80065 && newL2SetNumber == 126)){
+                if(( newL2SetNumber == 37)){
                     System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
                 }
 
             }
+            L2.performOperation('r', L2SetNumber, L2Tag, address);
+
             // L1.reads--; //subtracting one to account for copying from L2, not memory
         }
         else if (state == 3)
@@ -643,7 +665,7 @@ class OverallCache
                 int newL2SetNumber = evicted.address % this.L2.numSets;
                 int newL2Tag = evicted.address / this.L2.numSets;
 
-                if((newL2Tag == 0x8009b && newL2SetNumber == 126)){
+                if((newL2SetNumber == 37)){
                     System.out.println("evicted L1 to L2 tag: " + Integer.toHexString(newL2Tag) + " in set: " + newL2SetNumber);        
                 }
 
