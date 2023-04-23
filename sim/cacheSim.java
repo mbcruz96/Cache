@@ -1,3 +1,4 @@
+import java.awt.List;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -6,7 +7,7 @@ import java.util.Scanner;
 
 class Block {
     int tag;
-    int address;
+    long address;
     boolean dirty;
     boolean valid;
 
@@ -26,6 +27,7 @@ class CacheLevel
     int numSets;
     ArrayList<LinkedList<Integer>> tagArray;
     ArrayList<LinkedList<Block>> blockArray;
+    ArrayList<Long> allTraces;
     int replacementPolicy; // 1 = lru, 2 = fifo, 3 = optimal
 
     int reads;
@@ -33,6 +35,7 @@ class CacheLevel
     int writes;
     int writeMisses;
     int writebacks;
+    int counter;
 
     // int misses;
     // int hits;
@@ -40,7 +43,7 @@ class CacheLevel
     // int reads;
 
 
-    public CacheLevel(int assoc, long size, int block, int replacement)
+    public CacheLevel(int assoc, long size, int block, int replacement, ArrayList<Long> allTraces)
     {
         this.cacheSize = size;
         this.blockSize = block;
@@ -52,6 +55,8 @@ class CacheLevel
         this.reads = 0;
         this.readMisses = 0;
         this.writeMisses = 0;
+        this.allTraces = allTraces;
+        this.counter = 0;
 
         this.numSets = (int)(this.cacheSize / (long)(this.blockSize * this.associativity));
         this.tagArray = new ArrayList<LinkedList<Integer>>();
@@ -63,7 +68,7 @@ class CacheLevel
         }
     }
 
-    Block performOperation(char op, int setNumber, int tag, int address)
+    Block performOperation(char op, int setNumber, int tag, long address)
     {
         if (op == 'w')
         {
@@ -75,7 +80,7 @@ class CacheLevel
         }
     }
 
-    Block performWrite(int setNumber, int tag, int address)
+    Block performWrite(int setNumber, int tag, long address)
     {   
         int index = getIndexOfTag(setNumber, tag);
 
@@ -119,8 +124,13 @@ class CacheLevel
 
             if (replacementPolicy == 3)
             {
-                //perform optimal replacement
-
+                Block evictedBlock = doOptimalReplacement(setNumber, newBlock);
+                evictedBlock.valid = true;
+                if (evictedBlock.dirty == true)
+                {
+                    writebacks++;
+                }
+                return evictedBlock;
             }
             else
             {
@@ -150,7 +160,7 @@ class CacheLevel
         }
     }
 
-    Block performRead(int setNumber, int tag, int address) {
+    Block performRead(int setNumber, int tag, long address) {
         int index = getIndexOfTag(setNumber, tag);
 
         Block removedBlock = new Block();
@@ -158,7 +168,7 @@ class CacheLevel
 
         // the tag was found in the cache
         if (index != -1) {
-            if (replacementPolicy == 1) {
+            if (replacementPolicy == 1 || replacementPolicy == 3) {
                 updateLRU(setNumber, tag);
             }
             
@@ -188,7 +198,13 @@ class CacheLevel
             // optimal replacement policy placeholder
             if (replacementPolicy == 3) {
                 // perform optimal replacement
-
+                Block evictedBlock = doOptimalReplacement(setNumber, newBlock);
+                evictedBlock.valid = true;
+                if (evictedBlock.dirty == true)
+                {
+                    writebacks++;
+                }
+                return evictedBlock;
             } else {
                 // perform LRU/FIFO replacement
                 LinkedList<Integer> curSet1 = tagArray.get(setNumber);
@@ -262,9 +278,65 @@ class CacheLevel
         blockArray.set(setNumber, curSet2);
     }
 
-    void doOptimalReplacement()
+    Block doOptimalReplacement(int setNumber, Block newBlock)
     {
+        //get necessary sublist
+        ArrayList<Long> currentTrace = new ArrayList<Long>(this.allTraces.subList(counter, this.allTraces.size()));
+        int maxIndex = -1;
+        int indexToRemove = -1;
+        int i = 0;
+        boolean found = false;
+        
+        // System.out.println("Current set: " + this.tagArray.get(setNumber).toString());
+        //loop over all blocks
+        LinkedList<Integer> setTags = this.tagArray.get(setNumber);
+        LinkedList<Block> setBlocks = this.blockArray.get(setNumber);
+        // System.out.println("At line " + (counter + 1));
+        // System.out.println("The current set " + setNumber + " is: " + String.format("0x%08X", setBlocks.get(0).address) + " and " + String.format("0x%08X", setBlocks.get(1).address));
+        for (i = 0; i < setBlocks.size(); i++)
+        {
+            //get the next time the memory address is used
+            Block currBlock = setBlocks.get(i);
+            int indexInList = currentTrace.indexOf(currBlock.address);
+            // System.out.println("Address " + String.format("0x%08X", setBlocks.get(i).address) + " was found at index " + indexInList);
+            //if the next time is further than the current furthest, mark as furthest
+            //save the index in the list to remove
+            if (indexInList == -1)
+            {
+                indexToRemove = i;
+                found = true;
+                break;
+            }
+            if (indexInList > maxIndex)
+            {
+                maxIndex = indexInList;
+                indexToRemove = i;
+            }
+            
+            //increase the current index being searched
+        }
 
+        //catch statement for when not found in trace
+        if ((indexToRemove == -1) && (!found))
+        {
+            indexToRemove = this.blockArray.get(setNumber).size() - 1;
+        }
+
+        //remove the old element from the linked list and tag arrays
+        LinkedList<Block> curBlockArray= blockArray.get(setNumber);
+        LinkedList<Integer> curTagArray = tagArray.get(setNumber);
+
+        Block removedBlock = curBlockArray.remove(indexToRemove);
+        curTagArray.remove(indexToRemove);
+
+        curBlockArray.add(indexToRemove, newBlock);
+        curTagArray.add(indexToRemove, newBlock.tag);
+
+        this.tagArray.set(setNumber, curTagArray);
+        this.blockArray.set(setNumber, curBlockArray);
+
+        // System.out.println("Evicted: " + String.format("0x%08X", removedBlock.address));
+        return removedBlock;
     }
 
     Boolean contains(int setNumber, int tag)
@@ -322,20 +394,20 @@ class OverallCache
     CacheLevel L2;
     int inclusion;
 
-    public OverallCache(int l1Assoc, int l1Size, int l2Assoc, int l2Size, int block, int replacement, int inclusion)
+    public OverallCache(int l1Assoc, int l1Size, int l2Assoc, int l2Size, int block, int replacement, int inclusion, ArrayList<Long> allTraces)
     {
-        this.L1 = new CacheLevel(l1Assoc, l1Size, block, replacement);
-        this.L2 = new CacheLevel(l2Assoc, l2Size, block, replacement);
+        this.L1 = new CacheLevel(l1Assoc, l1Size, block, replacement, allTraces);
+        this.L2 = new CacheLevel(l2Assoc, l2Size, block, replacement, allTraces);
         this.inclusion = inclusion;
     }
 
-    public OverallCache(int l1Assoc, int l1Size, int block, int replacement, int inclusion)
+    public OverallCache(int l1Assoc, int l1Size, int block, int replacement, int inclusion, ArrayList<Long> allTraces)
     {
-        this.L1 = new CacheLevel(l1Assoc, l1Size, block, replacement);
+        this.L1 = new CacheLevel(l1Assoc, l1Size, block, replacement, allTraces);
         this.inclusion = inclusion;
     }
 
-    void startOperation(char op, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address)
+    void startOperation(char op, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, long address)
     {
         int state = -1;
         boolean L1Contains = L1.contains(L1SetNumber, L1Tag);
@@ -368,7 +440,7 @@ class OverallCache
         }
     }
 
-    void executeNoninclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address)
+    void executeNoninclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, long address)
     {
         if (state == 0)
         {
@@ -384,8 +456,8 @@ class OverallCache
 
             if(evicted.valid)
             {
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
+                int newL2SetNumber = (int)(evicted.address % this.L2.numSets);
+                int newL2Tag = (int)(evicted.address / this.L2.numSets);
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
             }
         }
@@ -397,8 +469,8 @@ class OverallCache
 
             if (evicted.valid)
             {
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
+                int newL2SetNumber =(int)(evicted.address % this.L2.numSets);
+                int newL2Tag = (int)(evicted.address / this.L2.numSets);
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
             }
             // L1.reads--; //subtracting one to account for copying from L2, not memory
@@ -411,14 +483,14 @@ class OverallCache
 
             if (evicted.valid)
             {
-                int newL2SetNumber = evicted.address % this.L2.numSets;
-                int newL2Tag = evicted.address / this.L2.numSets;
+                int newL2SetNumber = (int)(evicted.address % this.L2.numSets);
+                int newL2Tag = (int)(evicted.address / this.L2.numSets);
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
             }
         }
     }
 
-    void executeInclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address)
+    void executeInclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, long address)
     {
         if (state == 0 || state == 3)
         {
@@ -470,6 +542,9 @@ class CacheSim
         String inclusionProperty = args[6];
         String traceFile = args[7];
 
+        ArrayList<Long> allTraces = scanInAddresses(traceFile);
+        // System.out.println(allTraces.toString());
+
         // convert the replacement policy to an integer
         int replacementPolicyInt = -1;
         if (replacementPolicy.equals("LRU")) {
@@ -495,11 +570,11 @@ class CacheSim
         OverallCache cache;
         if (L2Exists)
         {
-            cache = new OverallCache(l1Assoc, l1Size, l2Assoc, l2Size, blockSize, replacementPolicyInt, inclusionPropertyInt);
+            cache = new OverallCache(l1Assoc, l1Size, l2Assoc, l2Size, blockSize, replacementPolicyInt, inclusionPropertyInt, allTraces);
         }
         else
         {
-            cache = new OverallCache(l1Assoc, l1Size, blockSize, replacementPolicyInt, inclusionPropertyInt);
+            cache = new OverallCache(l1Assoc, l1Size, blockSize, replacementPolicyInt, inclusionPropertyInt, allTraces);
         }
 
         Scanner in = new Scanner(new File(traceFile));
@@ -518,8 +593,9 @@ class CacheSim
                 int L2Tag = (int)(address / cache.L2.numSets);
                 
                 //execute operation
-                cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag, (int)address);
-                
+                cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag, address);
+                cache.L1.counter++;
+                cache.L2.counter++;
             }
             System.out.println("L1:");
             cache.L1.printStats();
@@ -548,7 +624,8 @@ class CacheSim
                 // System.out.println();
 
                 //execute operation
-                cache.L1.performOperation(op, L1SetNumber, L1Tag, (int)address);
+                cache.L1.performOperation(op, L1SetNumber, L1Tag, address);
+                cache.L1.counter++;
                 
             }
 
@@ -576,8 +653,19 @@ class CacheSim
         }
     }
 
-    void scanInAddresses()
+    static ArrayList<Long> scanInAddresses(String traceFile) throws FileNotFoundException
     {
-        
+        Scanner scanFile = new Scanner(new File(traceFile));
+        ArrayList<Long> listOfAddresses = new ArrayList<Long>();
+        while(scanFile.hasNext())
+        {
+            String nextLine = scanFile.nextLine();
+            nextLine = nextLine.substring(2);
+            long address = Long.parseLong(nextLine, 16);
+            address /= 16;
+            listOfAddresses.add(address);
+        }
+
+        return listOfAddresses;
     }
 }
