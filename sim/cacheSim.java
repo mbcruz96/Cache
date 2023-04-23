@@ -7,7 +7,7 @@ import java.util.Scanner;
 
 class Block {
     int tag;
-    long address;
+    int address;
     boolean dirty;
     boolean valid;
 
@@ -27,7 +27,7 @@ class CacheLevel
     int numSets;
     ArrayList<LinkedList<Integer>> tagArray;
     ArrayList<LinkedList<Block>> blockArray;
-    ArrayList<Long> allTraces;
+    ArrayList<Integer> allTraces;
     int replacementPolicy; // 1 = lru, 2 = fifo, 3 = optimal
 
     int reads;
@@ -43,7 +43,7 @@ class CacheLevel
     // int reads;
 
 
-    public CacheLevel(int assoc, long size, int block, int replacement, ArrayList<Long> allTraces)
+    public CacheLevel(int assoc, long size, int block, int replacement, ArrayList<Integer> allTraces)
     {
         this.cacheSize = size;
         this.blockSize = block;
@@ -68,7 +68,7 @@ class CacheLevel
         }
     }
 
-    Block performOperation(char op, int setNumber, int tag, long address)
+    Block performOperation(char op, int setNumber, int tag, int address)
     {
         if (op == 'w')
         {
@@ -80,7 +80,7 @@ class CacheLevel
         }
     }
 
-    Block performWrite(int setNumber, int tag, long address)
+    Block performWrite(int setNumber, int tag, int address)
     {   
         int index = getIndexOfTag(setNumber, tag);
 
@@ -182,7 +182,7 @@ class CacheLevel
         }
     }
 
-    Block performRead(int setNumber, int tag, long address) {
+    Block performRead(int setNumber, int tag, int address) {
         int index = getIndexOfTag(setNumber, tag);
 
         Block removedBlock = new Block();
@@ -326,7 +326,7 @@ class CacheLevel
     Block doOptimalReplacement(int setNumber, Block newBlock)
     {
         //get necessary sublist
-        ArrayList<Long> currentTrace = new ArrayList<Long>(this.allTraces.subList(counter, this.allTraces.size()));
+        ArrayList<Integer> currentTrace = new ArrayList<Integer>(this.allTraces.subList(counter, this.allTraces.size()));
         int maxIndex = -1;
         int indexToRemove = -1;
         int i = 0;
@@ -439,20 +439,20 @@ class OverallCache
     CacheLevel L2;
     int inclusion;
 
-    public OverallCache(int l1Assoc, int l1Size, int l2Assoc, int l2Size, int block, int replacement, int inclusion, ArrayList<Long> allTraces)
+    public OverallCache(int l1Assoc, int l1Size, int l2Assoc, int l2Size, int block, int replacement, int inclusion, ArrayList<Integer> allTraces)
     {
         this.L1 = new CacheLevel(l1Assoc, l1Size, block, replacement, allTraces);
         this.L2 = new CacheLevel(l2Assoc, l2Size, block, replacement, allTraces);
         this.inclusion = inclusion;
     }
 
-    public OverallCache(int l1Assoc, int l1Size, int block, int replacement, int inclusion, ArrayList<Long> allTraces)
+    public OverallCache(int l1Assoc, int l1Size, int block, int replacement, int inclusion, ArrayList<Integer> allTraces)
     {
         this.L1 = new CacheLevel(l1Assoc, l1Size, block, replacement, allTraces);
         this.inclusion = inclusion;
     }
 
-    void startOperation(char op, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, long address)
+    void startOperation(char op, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address)
     {
         int state = -1;
         boolean L1Contains = L1.contains(L1SetNumber, L1Tag);
@@ -485,7 +485,7 @@ class OverallCache
         }
     }
 
-    void executeNoninclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, long address)
+    void executeNoninclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address)
     {
         if (state == 0)
         {
@@ -535,7 +535,7 @@ class OverallCache
         }
     }
 
-    void executeInclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, long address)
+    void executeInclusive(char op, int state, int L1SetNumber, int L1Tag, int L2SetNumber, int L2Tag, int address)
     {
         if (state == 0 || state == 3)
         {
@@ -587,7 +587,7 @@ class CacheSim
         String inclusionProperty = args[6];
         String traceFile = args[7];
 
-        ArrayList<Long> allTraces = scanInAddresses(traceFile);
+        ArrayList<Integer> allTraces = scanInAddresses(traceFile);
         // System.out.println(allTraces.toString());
 
         // convert the replacement policy to an integer
@@ -642,7 +642,7 @@ class CacheSim
                 int L2Tag = (int)(address / cache.L2.numSets);
                 
                 //execute operation
-                cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag, address);
+                cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag, (int)address);
                 cache.L1.counter++;
                 cache.L2.counter++;
             }
@@ -673,7 +673,7 @@ class CacheSim
                 // System.out.println();
 
                 //execute operation
-                cache.L1.performOperation(op, L1SetNumber, L1Tag, address);
+                cache.L1.performOperation(op, L1SetNumber, L1Tag, (int)address);
                 cache.L1.counter++;
                 
             }
@@ -702,17 +702,17 @@ class CacheSim
         }
     }
 
-    static ArrayList<Long> scanInAddresses(String traceFile) throws FileNotFoundException
+    static ArrayList<Integer> scanInAddresses(String traceFile) throws FileNotFoundException
     {
         Scanner scanFile = new Scanner(new File(traceFile));
-        ArrayList<Long> listOfAddresses = new ArrayList<Long>();
+        ArrayList<Integer> listOfAddresses = new ArrayList<Integer>();
         while(scanFile.hasNext())
         {
             String nextLine = scanFile.nextLine();
             nextLine = nextLine.substring(2);
             long address = Long.parseLong(nextLine, 16);
             address /= 16;
-            listOfAddresses.add(address);
+            listOfAddresses.add((int)address);
         }
 
         return listOfAddresses;
