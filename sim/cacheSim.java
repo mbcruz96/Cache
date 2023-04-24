@@ -1,4 +1,3 @@
-import java.awt.List;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -110,7 +109,8 @@ class CacheLevel {
             newBlock.tag = tag;
             newBlock.valid = true;
             newBlock.address = address;
-
+            // print address
+            System.out.println("address: " + Integer.toHexString(address));
             if (tagArray.get(setNumber).size() < this.associativity) {
 
                 // insert to both without worrying, no need to evict because there is space left
@@ -233,7 +233,8 @@ class CacheLevel {
             newBlock.dirty = false;
             newBlock.valid = true;
             newBlock.address = address;
-            
+
+            System.out.println("address: " + Integer.toHexString(address));
 
 
             //print the tag that was a miss
@@ -437,7 +438,7 @@ class CacheLevel {
             //get the next time the memory address is used
             Block currBlock = setBlocks.get(i);
             int indexInList = currentTrace.indexOf(currBlock.address);
-            System.out.println("Address " + String.format("0x%08X", setBlocks.get(i).address) + " was found at index " + indexInList);
+            System.out.println("Address " + Integer.toHexString(setBlocks.get(i).address) + " was found at index " + indexInList);
             //if the next time is further than the current furthest, mark as furthest
             //save the index in the list to remove
             if (indexInList == -1)
@@ -790,7 +791,7 @@ class CacheSim {
                 // execute operation
                 // cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag,
                 // (int)address);
-                cache.startOperation(op, index1, tag1, index2, tag2, (int) address);
+                cache.startOperation(op, index1, tag1, index2, tag2, (int) (address / blockSize));
                 cache.L1.counter++;
                 cache.L2.counter++;
 
@@ -825,7 +826,7 @@ class CacheSim {
                 // execute operation
                 // cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag,
                 // (int)address);
-                cache.L1.performOperation(op, index1, tag1, (int)address);
+                cache.L1.performOperation(op, index1, tag1, (int)(address / blockSize));
                 cache.L1.counter++;
 
                 
