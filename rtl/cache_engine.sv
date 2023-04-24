@@ -25,7 +25,7 @@ module cache_engine(
       input reset,
       input write_policy,
       input replace_policy,
-      input[1:0] inclusion_policy,
+      input inclusion_policy,
       input[47:0] cache_addr,
       input[7:0] cache_op,
       output reg[31:0] curr_tag_L1,
@@ -248,7 +248,7 @@ module cache_engine(
                 end
                                 
                 // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
-                if(inclusion_policy == 2)begin
+                if(inclusion_policy == 1)begin
                 
                     L1_cache[L1_index][L1_ASSOC-1] <= 32'b0;
                     // Shifts through the current set with the size of the cache line to shift in FIFO order
@@ -306,7 +306,7 @@ module cache_engine(
                 end
                 
                 // If the current inclusion policy is Non-inclusive and L1 & L2 miss, then insert tag in both caches
-                if(inclusion_policy == 2)begin
+                if(inclusion_policy == 1)begin
                 
                     // Shifts through the current set with the size of the cache line to shift in FIFO order
                     for(i = L1_ASSOC-1; i >= 0; i = i - 1)begin
@@ -408,7 +408,7 @@ module cache_engine(
                         end
                         
                         // If replace policy is non-inclusive
-                        if(inclusion_policy == 2)begin
+                        if(inclusion_policy == 1)begin
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
                             if(L2_index > L1_ASSOC-1)begin
                                 // Pop out last address out of cache before shifting
@@ -446,7 +446,7 @@ module cache_engine(
                 else begin
                     // L2 cache
                     if(!L1_found && L2_found) begin
-                    
+                        L2_hits <= L2_hits + 1;
                         L1_misses <= L1_misses + 1;
                         L1_reads <= L1_reads + 1;
                         if(write_policy == 1 && cache_op == 7'h57)begin
@@ -489,7 +489,7 @@ module cache_engine(
                         end
                         
                         // If replace policy is non-inclusive
-                        if(inclusion_policy == 2)begin
+                        if(inclusion_policy == 1)begin
                             // If the current L2 set is outside the range of the L1 sets, then write tag to 1st L1 set
                             if(L2_index > L1_ASSOC-1)begin
                                 // Pop out last address out of cache before shifting
