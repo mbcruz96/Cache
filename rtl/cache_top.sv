@@ -25,7 +25,7 @@ module cache_top(
   input reset,
   input write_policy,
   input replace_policy,
-  input[1:0] inclusion_policy,
+  input inclusion_policy,
   input[47:0] cache_addr,
   input[7:0] cache_op,
   output reg[17:0] L1_reads, L1_misses, L1_hits, L1_writes,
@@ -34,7 +34,7 @@ module cache_top(
 
   // write_policy: 0 -> write through | 1 -> write back                         DONE
   // replace_policy: 0 -> FIFO | 1 -> LRU                                       DONE
-  // inclusion_policy: 0 -> inclusive | 1 -> exclusive | 2 -> non-inclusive     IN-PROGRESS
+  // inclusion_policy: 0 -> inclusive | 2 -> non-inclusive                      DONE
   // cache_op: W or R
   reg[31:0] L1_cache [0:L1_NUMSETS-1][0:L1_ASSOC-1];
   reg[31:0] L2_cache [0:L2_NUMSETS-1][0:L2_ASSOC-1];

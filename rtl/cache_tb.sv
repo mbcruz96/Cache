@@ -23,7 +23,7 @@
 module cache_tb();
     reg clk, reset;
     reg write_policy, replace_policy;
-    reg[1:0] inclusion_policy;
+    reg inclusion_policy;
     reg[47:0] cache_addr;
     reg[7:0] cache_op;
     wire[17:0] L1_reads, L1_writes, L1_misses, L1_hits;
@@ -31,15 +31,9 @@ module cache_tb();
     wire[31:0] curr_tag_L1, curr_tag_L2;
     wire[31:0] cache1 [0:L1_NUMSETS-1][0:L1_ASSOC-1];
     wire[31:0] cache2 [0:L2_NUMSETS-1][0:L2_ASSOC-1];
-    reg[11:0] curr_set;
     parameter SIZE = 100000;
     reg[47:0] test_addrs[0:SIZE-1];
     reg[7:0] test_ops[0:SIZE-1];
-    
-    //trace_addr TEST_ADDRS(.test_addrs(test_addrs));
-    //trace_op TEST_OPS(.test_ops(test_ops));
-    
-    
     real L1_miss_rate, L2_miss_rate;
     real L1misses, L1reads, L1hits, L1writes;
     real L2misses, L2reads, L2hits, L2writes;
@@ -81,11 +75,11 @@ module cache_tb();
     ************************************************************************************************   
     */
     initial begin
-        $readmemh("C:/Users/JohnG/Desktop/Codes/School/CDA5106/rtl/traces/go_trace_addresses.txt", test_addrs, 0, 99999);
-        $readmemh("C:/Users/JohnG/Desktop/Codes/School/CDA5106/rtl/traces/go_trace_actions.txt", test_ops, 0, 99999);
+        $readmemh("C:/Users/JohnG/Desktop/Codes/School/CDA5106/rtl/traces/gcc_trace_addresses.txt", test_addrs, 0, 99999);
+        $readmemh("C:/Users/JohnG/Desktop/Codes/School/CDA5106/rtl/traces/gcc_trace_actions.txt", test_ops, 0, 99999);
         replace_policy = 1;
         write_policy = 1;
-        inclusion_policy = 2;
+        inclusion_policy = 1;
         clk = 1;
         reset = 1;
         #10
