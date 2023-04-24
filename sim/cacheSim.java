@@ -437,7 +437,7 @@ class CacheLevel {
         {
             //get the next time the memory address is used
             Block currBlock = setBlocks.get(i);
-            int indexInList = currentTrace.indexOf(currBlock.address);
+            int indexInList = currentTrace.indexOf(currBlock.address / this.blockSize);
             System.out.println("Address " + Integer.toHexString(setBlocks.get(i).address) + " was found at index " + indexInList);
             //if the next time is further than the current furthest, mark as furthest
             //save the index in the list to remove
@@ -637,32 +637,43 @@ class OverallCache {
         } else if (state == 1) {
             // exists only in l1, deal with eviction but do nothing else
             // L2.misses++;
-            Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
+            // Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
 
-            if (evicted.valid && evicted.dirty) {
-                // print out the evicted block
+            // if (evicted.valid && evicted.dirty) {
+            //     // print out the evicted block
 
-                int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
-                        & ((1 << CacheSim.indexBits2) - 1);
-                int newL2Tag = evicted.address >> CacheSim.tagBits2;
-                System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
+            //     int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
+            //             & ((1 << CacheSim.indexBits2) - 1);
+            //     int newL2Tag = evicted.address >> CacheSim.tagBits2;
+            //     System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
 
-                this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
-            }
+            //     this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
+            // }
         } else if (state == 2) {
             // exists only in l2, move it into l1, deal with the eviction it causes
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
 
+            //delroys comment
+            
+            System.out.println("L1 victim : "+ (evicted.valid ? evicted.address : "none"));
+
             if (evicted.valid && evicted.dirty) {
 
                 int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
                         & ((1 << CacheSim.indexBits2) - 1);
                 int newL2Tag = evicted.address >> CacheSim.tagBits2;
+
                 System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
 
+                // taylors comments
+                // if (op == 'r') {
+                // L2.writeMisses++;
+                // }
+
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
+
             }
-            L2.performOperation('r', L2SetNumber, L2Tag, address);
+            L2.performOperation(op, L2SetNumber, L2Tag, address);
 
             // L1.reads--; //subtracting one to account for copying from L2, not memory
         } else if (state == 3) {
@@ -670,13 +681,11 @@ class OverallCache {
             Block evicted = L1.performOperation(op, L1SetNumber, L1Tag, address);
 
             if (evicted.valid && evicted.dirty) {
-
                 int newL2SetNumber = ((int) evicted.address >> (CacheSim.blockOffsetBits))
                         & ((1 << CacheSim.indexBits2) - 1);
                 int newL2Tag = evicted.address >> CacheSim.tagBits2;
                 System.out.println("trying to access L2 tag: " + Integer.toHexString(newL2Tag));        
 
-                // todo: if this bit is dirty its a write else read
                 this.L2.performOperation('w', newL2SetNumber, newL2Tag, evicted.address);
 
             }
@@ -708,7 +717,7 @@ class CacheSim {
         String inclusionProperty = args[6];
         String traceFile = args[7];
 
-        ArrayList<Integer> allTraces = scanInAddresses(traceFile);
+        ArrayList<Integer> allTraces = scanInAddresses(traceFile, blockSize);
         // System.out.println(allTraces.toString());
 
         // convert the replacement policy to an integer
@@ -791,7 +800,7 @@ class CacheSim {
                 // execute operation
                 // cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag,
                 // (int)address);
-                cache.startOperation(op, index1, tag1, index2, tag2, (int) (address / blockSize));
+                cache.startOperation(op, index1, tag1, index2, tag2, (int)address);
                 cache.L1.counter++;
                 cache.L2.counter++;
 
@@ -826,7 +835,7 @@ class CacheSim {
                 // execute operation
                 // cache.startOperation(op, L1SetNumber, L1Tag, L2SetNumber, L2Tag,
                 // (int)address);
-                cache.L1.performOperation(op, index1, tag1, (int)(address / blockSize));
+                cache.L1.performOperation(op, index1, tag1, (int)address);
                 cache.L1.counter++;
 
                 
@@ -905,7 +914,7 @@ class CacheSim {
             System.out.println("m. total memory traffic:\t" + (L1.readMisses + L1.writeMisses + L1.writebacks));
         }
     }
-    static ArrayList<Integer> scanInAddresses(String traceFile) throws FileNotFoundException
+    static ArrayList<Integer> scanInAddresses(String traceFile, int blockSize) throws FileNotFoundException
     {
         Scanner scanFile = new Scanner(new File(traceFile));
         ArrayList<Integer> listOfAddresses = new ArrayList<Integer>();
@@ -914,7 +923,7 @@ class CacheSim {
             String nextLine = scanFile.nextLine();
             nextLine = nextLine.substring(2);
             long address = Long.parseLong(nextLine, 16);
-            address /= 16;
+            address /= blockSize;
             listOfAddresses.add((int)address);
         }
 
